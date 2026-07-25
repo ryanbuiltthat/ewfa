@@ -1,6 +1,6 @@
 # Creek Flood Early-Warning System
 
-A DIY flood early-warning system for a property mid-watershed on Ackerly Creek (Glenburn Township, Lackawanna County, PA) — built on Home Assistant, ESPHome, and a radar-based stream gauge, with a roadmap toward predictive flood-probability modeling.
+A DIY flood early-warning system for a property mid-watershed on Ackerly Creek (Lackawanna County, PA) — built on Home Assistant, ESPHome, and a radar-based stream gauge, with a roadmap toward predictive flood-probability modeling.
 
 There is no official USGS gauge on this creek. This project instruments the creek directly and fuses that reading with upstream rainfall, soil saturation, forecast precipitation, and National Water Model data to give advance warning before water rises — motivated by a prior basement flood at the property.
 
@@ -23,7 +23,7 @@ creek-flood-warning-spec.md   Source-of-truth project specification
 
 ## Hardware
 
-- DFRobot SEN0676 80 GHz FMCW radar water-level sensor
+-[DFRobot SEN0676](https://www.dfrobot.com/product-2959.html) 80 GHz FMCW radar water-level sensor
 - ESP32-C6 (ESPHome)
 - Solar panel + LiPo battery + Adafruit solar charger
 - Ecowitt weather station + WH51 soil moisture probes
