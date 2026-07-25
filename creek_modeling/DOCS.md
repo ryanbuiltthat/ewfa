@@ -10,6 +10,41 @@ results to Home Assistant over MQTT.
   will exit on start if no MQTT service is available.
 - Host architecture **amd64** (the add-on is amd64-only).
 
+## Companion Home Assistant config (required)
+
+This add-on is **headless** — it only publishes/subscribes over MQTT. The HA entities and the
+Flood Watch dashboard are **not** part of the add-on; they live in the repo and must be added
+to your HA config once (the add-on won't create them):
+
+1. **Copy** these from the [ewfa repo](https://github.com/ryanbuiltthat/ewfa) into your HA
+   config directory (via the Samba or File editor add-on):
+   - `ha-packages/creek_warning.yaml` and `ha-packages/creek_modeling.yaml` → `/config/ha-packages/`
+   - `dashboards/creek_flood_watch.yaml` → `/config/dashboards/`
+2. **Enable packages + register the dashboard** in `/config/configuration.yaml`:
+
+   ```yaml
+   homeassistant:
+     packages: !include_dir_named ha-packages
+
+   lovelace:
+     mode: storage            # keeps your existing UI dashboards untouched
+     dashboards:
+       creek-flood-watch:     # slug must contain a hyphen
+         mode: yaml
+         title: Creek Flood Watch
+         icon: mdi:water-alert
+         show_in_sidebar: true
+         filename: dashboards/creek_flood_watch.yaml
+   ```
+
+   Both `!include_dir_named` and `filename:` are relative to the config directory. `template:`
+   and `mqtt:` merge with anything you already have, so this is additive.
+3. **Developer Tools → YAML → Check Configuration**, then **Restart**. The `creek_*` MQTT
+   sensors/buttons appear, and *Creek Flood Watch* shows in the sidebar.
+
+> The repo is the source of truth; the copies in `/config` are a deploy target. Re-copy after
+> pulling repo changes.
+
 ## Configuration
 
 Set these on the **Configuration** tab.

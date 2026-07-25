@@ -27,6 +27,13 @@ add-on installs and updates entirely through the GUI; a local-add-on copy still 
    under **Local add-ons**.
 3. Open it, set options on the **Configuration** tab, then **Start**.
 
+## Required HA-side config
+
+The add-on is headless (MQTT only) — the `creek_*` entities and the **Creek Flood Watch**
+dashboard are not created by the add-on. Copy `ha-packages/` and `dashboards/` from this repo
+into your HA config dir and add the `homeassistant: packages:` + `lovelace: dashboards:` blocks.
+Full steps are in [DOCS.md](./DOCS.md#companion-home-assistant-config-required).
+
 ## How it talks to HA
 
 - **Reads** entity states through the Supervisor proxy at `http://supervisor/core/api`,
