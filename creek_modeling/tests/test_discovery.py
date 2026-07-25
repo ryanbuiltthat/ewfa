@@ -20,7 +20,7 @@ def test_topics_and_counts():
     # 14 sensors + 4 buttons
     sensors = [t for t, _ in pairs if "/sensor/" in t]
     buttons = [t for t, _ in pairs if "/button/" in t]
-    assert len(sensors) == 21, len(sensors)   # 14 status/model + 7 rain/QPF
+    assert len(sensors) == 29, len(sensors)   # 14 status/model + 7 (2a) + 8 (2b)
     assert len(buttons) == 4, len(buttons)
     for topic, _ in pairs:
         assert topic.startswith("homeassistant/")
@@ -71,7 +71,7 @@ def test_rain_and_qpf_sensors_present():
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 25
+    assert len(published) == 33
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON

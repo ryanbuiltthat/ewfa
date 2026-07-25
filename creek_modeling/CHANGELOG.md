@@ -3,6 +3,18 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.5.0
+
+- **Forecast/upstream ingestion — slice 2b** (spec Addendum C): adds two sources, published
+  on `creek/features` and auto-created as discovery sensors:
+  - **Weather Underground upstream PWS** — mean `precipRate` across the configured upstream
+    stations feeds a rolling accumulator (`upstream_rain_{1,3,6,24,72}h`), plus
+    `upstream_precip_today`. A single station failing is skipped, not fatal. Key stays in options.
+  - **NWM / NWPS reach** — short-range streamflow forecast for `nwm_reach_id`: near-term
+    (`nwm_flow`) and short-range peak (`nwm_flow_peak`) discharge in ft³/s.
+- Extracts the rolling accumulator into `app/sources/accumulator.py`, shared by on-site rain
+  and upstream WU. Dashboard gains an "Upstream & model" card. Tests for WU + NWM. Bump 0.5.0.
+
 ## 0.4.0
 
 - **Forecast/upstream ingestion — slice 2a** (spec Addendum C): the add-on now fetches its

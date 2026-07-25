@@ -415,9 +415,9 @@ read once from HA `/api/config` — no new option.
   - `nws.py` — `api.weather.gov` `points/{lat},{lon}` → `forecastGridData` →
     `quantitativePrecipitation` (mm, ISO-interval values); pro-rated into `qpf_6h_in` /
     `qpf_24h_in`. No key; requires a `User-Agent`. Refresh ~15 min.
-- **2b — upstream + model (later):** `wu.py` (Weather Underground PWS upstream accumulations,
-  `wu_api_key` + `upstream_pws_ids`) and `nwm.py` (NWPS reach streamflow forecast,
-  `nwm_reach_id`).
+- **2b — upstream + model (done):** `wu.py` (Weather Underground PWS upstream accumulations
+  via the shared accumulator, `wu_api_key` + `upstream_pws_ids`) and `nwm.py` (NWPS reach
+  short-range streamflow forecast — near-term + peak discharge, `nwm_reach_id`).
 
 ### C.3 Consumption
 

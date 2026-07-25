@@ -11,6 +11,9 @@ from app.sources import FEATURE_KEYS, SourceCoordinator  # noqa: E402
 
 class _Cfg:
     onsite_rain_rate_entity = None   # -> no rain source built
+    wu_api_key = ""                  # -> no WU source
+    upstream_pws_ids = []
+    nwm_reach_id = ""                # -> no NWM source
 
 
 class _HA:

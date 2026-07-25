@@ -94,6 +94,24 @@ views:
           - entity: sensor.creek_qpf_24h
             name: Forecast rain (next 24 h)
 
+      - type: entities
+        title: Upstream & model
+        show_header_toggle: false
+        entities:
+          - entity: sensor.creek_upstream_rain_1h
+            name: Upstream rain (1 h)
+          - entity: sensor.creek_upstream_rain_6h
+            name: Upstream rain (6 h)
+          - entity: sensor.creek_upstream_rain_24h
+            name: Upstream rain (24 h)
+          - entity: sensor.creek_upstream_precip_today
+            name: Upstream rain (today)
+          - type: divider
+          - entity: sensor.creek_nwm_flow
+            name: NWM forecast flow
+          - entity: sensor.creek_nwm_flow_peak
+            name: NWM forecast peak
+
   # ============================ OPERATOR ==============================
   - title: Operator
     path: operator

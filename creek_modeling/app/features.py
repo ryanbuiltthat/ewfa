@@ -34,6 +34,14 @@ class FeatureRow:
     rain_72h_in: float | None = None
     qpf_6h_in: float | None = None
     qpf_24h_in: float | None = None
+    upstream_rain_1h_in: float | None = None
+    upstream_rain_3h_in: float | None = None
+    upstream_rain_6h_in: float | None = None
+    upstream_rain_24h_in: float | None = None
+    upstream_rain_72h_in: float | None = None
+    upstream_precip_today_in: float | None = None
+    nwm_flow_cfs: float | None = None
+    nwm_flow_max_cfs: float | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)

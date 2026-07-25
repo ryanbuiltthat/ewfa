@@ -143,6 +143,34 @@ class DiscoveryPublisher:
                 "value_template": "{{ value_json.qpf_24h_in if value_json.qpf_24h_in is not none else none }}",
                 "unit_of_measurement": "in", "device_class": "precipitation",
                 "state_class": "measurement", "icon": "mdi:weather-rainy"}),
+            # --- ingested features (Addendum C 2b): upstream WU + NWM reach ---
+            *(
+                ("sensor", f"creek_upstream_rain_{w}h", {
+                    "name": f"Creek Upstream Rain {w}h",
+                    "state_topic": f"{b}/features",
+                    "value_template": f"{{{{ value_json.upstream_rain_{w}h_in if value_json.upstream_rain_{w}h_in is not none else none }}}}",
+                    "unit_of_measurement": "in", "device_class": "precipitation",
+                    "state_class": "measurement", "icon": "mdi:weather-pouring"})
+                for w in (1, 3, 6, 24, 72)
+            ),
+            ("sensor", "creek_upstream_precip_today", {
+                "name": "Creek Upstream Precip Today",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.upstream_precip_today_in if value_json.upstream_precip_today_in is not none else none }}",
+                "unit_of_measurement": "in", "device_class": "precipitation",
+                "state_class": "measurement", "icon": "mdi:weather-pouring"}),
+            ("sensor", "creek_nwm_flow", {
+                "name": "Creek NWM Flow",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.nwm_flow_cfs if value_json.nwm_flow_cfs is not none else none }}",
+                "unit_of_measurement": "ft³/s", "state_class": "measurement",
+                "icon": "mdi:waves-arrow-right"}),
+            ("sensor", "creek_nwm_flow_peak", {
+                "name": "Creek NWM Flow Peak",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.nwm_flow_max_cfs if value_json.nwm_flow_max_cfs is not none else none }}",
+                "unit_of_measurement": "ft³/s", "state_class": "measurement",
+                "icon": "mdi:waves-arrow-up"}),
             # --- command buttons ---
             ("button", "creek_run_inference_now", {
                 "name": "Creek Run Inference Now",
