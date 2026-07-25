@@ -63,7 +63,7 @@
 
 **Layer 1 — HA package** (`packages/creek_warning.yaml`): ESPHome entities, REST sensors per API, template sensors (rate-of-rise in/min, 1/6/24/72-h rain accumulations, Antecedent Precipitation Index), alert automations, sensor-fault watchdogs (stale data, radar/pressure divergence when transducer added).
 
-**Layer 2 — Modeling service** (Python, containerized; add-on if HA install type supports it — *open question: HAOS vs Container on the mini PC*):
+**Layer 2 — Modeling service** (Python, containerized as a **local Home Assistant add-on** — HA install is HAOS; see [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1)):
 - **Fast loop (5 min):** compute flood probability + predicted stage from live features; publish via MQTT.
 - **Nightly batch:** append day's data to dataset (Parquet/SQLite), recalibrate/retrain, version model artifact, log skill metrics (hit rate, false alarms, lead time), publish model_health.
 - Post-storm: manual review + model promotion step.
@@ -111,14 +111,209 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 - Dev environment: Windows, Git Bash, VS Code + Claude Code; corporate SSL notes apply on work machine only — prefer home environment for this repo.
 - ESPHome-first for all firmware; YAML in-repo; consistent with existing fleet (16-ch CT power meter, etc.).
 - HA config as packages under version control; secrets via `secrets.yaml` / HA credentials — never committed.
-- Modeling service: Python 3.11+, containerized, single `docker-compose.yml`, data in Parquet + SQLite, MQTT for HA interface.
+- Modeling service: Python 3.11+, packaged as a **local HAOS add-on** (`config.yaml` + `Dockerfile` + `run.sh`), data in Parquet + SQLite under `/data`, MQTT for HA interface. See [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1).
 - Every automation that can wake the family must be testable via a dry-run script/service.
 
 ## 9. Open Questions (resolve in Phase 1–2)
 
-1. HA install type on mini PC (HAOS/Supervised → add-on path; Container → sidecar docker-compose path).
+1. ~~HA install type on mini PC (HAOS/Supervised → add-on path; Container → sidecar docker-compose path).~~ **RESOLVED: HA install is HAOS.** Layer 2 modeling service is built as a local add-on — see [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1).
 2. Google Floods API: does a virtual gauge (hybas) land on Ackerly Creek or nearest SB Tunkhannock reach? What are its thresholds?
 3. NWM reach ID for the Ackerly segment at 41.5237,-75.7304.
 4. Which 3–5 upstream PWS stations are reliable (uptime, tipping-bucket quality)?
 5. Exact low-water reference datum and surveyed bank height at the sensor site (measure at install).
 6. WiFi RSSI at the pole via the outdoor AP (bag test before final mount).
+
+---
+
+## Addendum A — Modeling service as a HAOS add-on (resolves Open Question #1)
+
+**Decision:** The Home Assistant install on the mini PC is **HAOS** (Home Assistant Operating System, Supervisor-managed). The Layer 2 modeling service is therefore built as a **local add-on**, not a sidecar `docker-compose` service. This addendum supersedes the "Docker container *or* HAOS add-on" hedge in §4 and the `docker-compose.yml` note in §8.
+
+### A.1 Why add-on over sidecar Container
+
+- HAOS does not expose the host Docker socket for user compose stacks; add-ons are the supported way to run custom containers on HAOS.
+- The Supervisor provides, for free, exactly the plumbing this service needs: an authenticated **proxy to the HA Core API** (no long-lived token to mint or rotate), **MQTT service discovery** (broker host/credentials injected at runtime), managed lifecycle (auto-start, restart, logs, watchdog), and a **persistent `/data` volume** that survives add-on updates.
+- Config UI comes for free: the `schema` block renders a form in **Settings → Add-ons**, so API keys and thresholds are edited in the HA UI instead of a `.env` file. This is a natural stepping-stone toward the Layer 3 HACS integration's config flow (§4).
+
+### A.2 Add-on repository layout
+
+Develop as a **local add-on** first: drop the folder into the HAOS `/addons` directory (via the Samba or SSH add-on, or `addon_config`), and it appears under **Settings → Add-ons → Local add-ons**. Promote to a Git-based add-on repository later for versioned installs.
+
+```text
+/addons/creek_modeling/
+├── config.yaml          # add-on manifest + options schema
+├── Dockerfile           # build recipe (HA base image + Python deps)
+├── run.sh               # entrypoint (bashio: read options, export env, exec service)
+├── requirements.txt     # pandas, pyarrow, xgboost/lightgbm, paho-mqtt, requests, ...
+├── icon.png / logo.png  # optional, for the add-on store card
+└── app/                 # the modeling service itself
+    ├── __main__.py      # fast loop (5 min) + nightly batch scheduler
+    ├── features.py      # feature builders (rate-of-rise, APIndex, accumulations)
+    ├── model.py         # train / infer / registry
+    └── ha.py            # HA Core API + MQTT clients
+```
+
+### A.3 `config.yaml` manifest (with options schema)
+
+```yaml
+name: Ackerly Creek Modeling
+version: "0.1.0"
+slug: creek_modeling
+description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
+url: https://github.com/ryanbuiltthat/ewfa
+arch:
+  - amd64          # mini PC; add aarch64 only if the host changes
+startup: application # start after HA Core is up (needs the API + MQTT)
+boot: auto
+init: false          # s6-overlay from the base image is the init; run.sh is the service
+
+# --- Supervisor-granted capabilities ---
+homeassistant_api: true   # proxy to Core REST API at http://supervisor/core/api
+hassio_api: true          # (optional) Supervisor API, e.g. to read add-on/service info
+auth_api: false
+services:
+  - mqtt:need             # auto-discover the Mosquitto broker; creds injected at runtime
+map:
+  - addon_config:rw       # optional: human-editable configs/notes outside /data
+  - share:rw              # optional: drop Parquet exports where other tools can read them
+
+# --- User-configurable options (rendered as a form in the HA UI) ---
+options:
+  log_level: info
+  fast_loop_minutes: 5
+  nightly_retrain_hour: 3
+  mqtt_base_topic: creek
+  publish_prefix: creek          # -> sensor.creek_flood_probability, etc.
+  min_events_for_ml: 10          # gate: threshold model until >= N storms captured
+  google_floods_api_key: ""
+  wu_api_key: ""
+  nwm_reach_id: ""
+  upstream_pws_ids: []
+
+schema:
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
+  fast_loop_minutes: int(1,60)
+  nightly_retrain_hour: int(0,23)
+  mqtt_base_topic: str
+  publish_prefix: str
+  min_events_for_ml: int(1,100)
+  google_floods_api_key: password?
+  wu_api_key: password?
+  nwm_reach_id: str?
+  upstream_pws_ids:
+    - str
+```
+
+Notes:
+
+- `password?` masks secrets in the UI and marks them optional; keys live in Supervisor-managed options, not in a committed file (consistent with §8's "never commit secrets").
+- `services: [mqtt:need]` makes the add-on refuse to start unless an MQTT broker (Mosquitto add-on) is present, and injects host/port/user/pass via `bashio::services mqtt`.
+- No `ports:` are published — the service is headless and talks out via MQTT + the Supervisor API proxy. Add a `ports`/`ingress` block later only if a debug/status web UI is wanted.
+
+### A.4 `Dockerfile`
+
+Use the Debian add-on base image (Alpine/musl makes `xgboost`/`lightgbm`/`pandas` wheels painful); it ships `bashio`, `s6-overlay`, and `tempio`.
+
+```dockerfile
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-debian:bookworm
+FROM ${BUILD_FROM}
+
+ENV LANG=C.UTF-8 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-pip python3-venv libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install --break-system-packages -r /tmp/requirements.txt
+
+COPY run.sh /run.sh
+COPY app/ /app/
+RUN chmod a+x /run.sh
+
+CMD [ "/run.sh" ]
+```
+
+(`libgomp1` is the OpenMP runtime XGBoost/LightGBM link against.) `BUILD_FROM` is overridden per-arch by Supervisor at build time via a `build.yaml`, but pinning amd64 as the default is fine for a single mini PC.
+
+### A.5 `run.sh` (entrypoint)
+
+```bash
+#!/usr/bin/with-contenv bashio
+set -euo pipefail
+
+# --- Options → environment ---
+export LOG_LEVEL="$(bashio::config 'log_level')"
+export FAST_LOOP_MINUTES="$(bashio::config 'fast_loop_minutes')"
+export NIGHTLY_RETRAIN_HOUR="$(bashio::config 'nightly_retrain_hour')"
+export MQTT_BASE_TOPIC="$(bashio::config 'mqtt_base_topic')"
+export PUBLISH_PREFIX="$(bashio::config 'publish_prefix')"
+export MIN_EVENTS_FOR_ML="$(bashio::config 'min_events_for_ml')"
+export GOOGLE_FLOODS_API_KEY="$(bashio::config 'google_floods_api_key')"
+export WU_API_KEY="$(bashio::config 'wu_api_key')"
+export NWM_REACH_ID="$(bashio::config 'nwm_reach_id')"
+
+# --- HA Core API via the Supervisor proxy (no long-lived token needed) ---
+export HA_API_URL="http://supervisor/core/api"
+export SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN}"   # injected by Supervisor
+
+# --- MQTT from the Mosquitto add-on via service discovery ---
+if bashio::services.available "mqtt"; then
+  export MQTT_HOST="$(bashio::services 'mqtt' 'host')"
+  export MQTT_PORT="$(bashio::services 'mqtt' 'port')"
+  export MQTT_USER="$(bashio::services 'mqtt' 'username')"
+  export MQTT_PASS="$(bashio::services 'mqtt' 'password')"
+else
+  bashio::exit.nok "No MQTT service available — install/configure the Mosquitto add-on."
+fi
+
+# --- Persistent storage (survives add-on updates/restarts) ---
+export DATA_DIR="/data"          # dataset.parquet, events.sqlite, model registry
+mkdir -p "${DATA_DIR}/models" "${DATA_DIR}/datasets"
+
+bashio::log.info "Starting Ackerly Creek modeling service (fast loop ${FAST_LOOP_MINUTES}m)…"
+exec python3 -m app
+```
+
+### A.6 HA access via the Supervisor proxy
+
+Because `homeassistant_api: true` is set, the container reaches HA Core at `http://supervisor/core/api`, authenticating with the `SUPERVISOR_TOKEN` env var that Supervisor injects — **no user-created long-lived access token is required or stored.**
+
+```python
+# app/ha.py  (sketch)
+import os, requests
+_HDRS = {"Authorization": f"Bearer {os.environ['SUPERVISOR_TOKEN']}",
+         "Content-Type": "application/json"}
+def get_state(entity_id: str):
+    r = requests.get(f"{os.environ['HA_API_URL']}/states/{entity_id}",
+                     headers=_HDRS, timeout=10)
+    r.raise_for_status()
+    return r.json()
+```
+
+Live inputs (current stage, on-site/upstream rain, soil moisture, QPF/NWM/SNODAS REST sensors from Layer 1) are read either from Core states via this proxy **or**, for history/backfill, from the recorder/InfluxDB as before. Outputs (`flood_probability`, `predicted_crest`, `lag_estimate`, `model_health`) are **published over MQTT** using the discovered broker — matching the §4 architecture diagram — so HA sees them as MQTT sensors and the alert automations (§6) fire off those entities.
+
+### A.7 Persistent storage layout (`/data`)
+
+Supervisor bind-mounts a per-add-on volume at `/data` that persists across restarts and add-on updates; `/data/options.json` holds the current options (already parsed by `bashio::config`). The service owns the rest:
+
+```text
+/data/
+├── options.json                 # (managed by Supervisor)
+├── datasets/
+│   └── dataset.parquet          # nightly-appended feature/label rows (§4 batch)
+├── events.sqlite                # annotated storm event log (§7 Phase 3)
+├── models/
+│   ├── registry.json            # versioned artifacts + skill metrics (hit rate, FA, lead time)
+│   └── model-<version>.pkl      # promoted artifacts (§4 post-storm promotion)
+└── state/
+    └── last_run.json            # fast-loop / nightly-batch bookkeeping
+```
+
+This satisfies §4's "append day's data to dataset (Parquet/SQLite), version model artifact" and §7's storm event log without any external volume.
+
+### A.8 Impact on phases
+
+- **Phase 2 (Ingest):** unchanged in scope; the add-on skeleton (`config.yaml`/`Dockerfile`/`run.sh` + a no-op fast loop that just logs) can be stood up here to validate the Supervisor proxy + MQTT wiring before any modeling exists.
+- **Phase 4 (Predict):** the fast-loop inference service and nightly retrain land inside this add-on; `min_events_for_ml` gates the threshold→ML transition (§5) via an option, no rebuild required.
+- **Build/CI:** local-add-on iteration needs no registry; when promoting to a Git add-on repo, reuse the existing ESPHome-fleet GitHub Actions pattern (§8) to lint (`config.yaml`) and build the image per push.
