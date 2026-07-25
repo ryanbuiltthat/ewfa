@@ -21,11 +21,13 @@ from datetime import datetime
 from .commands import CommandProcessor, CommandQueue
 from .config import DATA_DIR, Config
 from .dataset import DatasetWriter
+from .discovery import DiscoveryPublisher
 from .features import FeatureBuilder
 from .ha import HAClient
 from .model import Model
 from .mqtt_client import MqttClient
 from .registry import ModelRegistry
+from .tiers import compute_tier
 
 log = logging.getLogger("app")
 
@@ -63,9 +65,11 @@ def _run_inference_once(
     mqtt.publish("flood_probability", {"value": pred.flood_probability, "method": pred.method})
     mqtt.publish("predicted_crest", {"value": pred.predicted_crest_ft})
     mqtt.publish("lag_estimate", {"value": pred.lag_estimate_min})
+    tier, label = compute_tier(pred.flood_probability, row.ponding_flag)
+    mqtt.publish("alert_tier", {"value": tier, "label": label})
     dataset.append_row(row)
     status["last_inference_at"] = _now_iso()
-    return f"p={pred.flood_probability} method={pred.method}"
+    return f"p={pred.flood_probability} tier={tier} method={pred.method}"
 
 
 def _nightly_batch(
@@ -128,6 +132,10 @@ def main() -> int:
     cmd_queue = CommandQueue()
     mqtt = MqttClient(cfg.mqtt_host, cfg.mqtt_port, cfg.mqtt_user, cfg.mqtt_pass, cfg.mqtt_base_topic)
     mqtt.subscribe_commands(cmd_queue)   # subscription happens on connect
+    # Auto-provision the creek_* entities via MQTT discovery (re-published on every
+    # (re)connect, so HA picks them up without any package/config edit).
+    discovery = DiscoveryPublisher(mqtt.publish_raw, cfg.mqtt_base_topic)
+    mqtt.add_on_ready(discovery.publish_all)
     mqtt.connect()
 
     features = FeatureBuilder(cfg, ha)

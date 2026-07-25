@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.2.0"
+version: "0.3.0"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa

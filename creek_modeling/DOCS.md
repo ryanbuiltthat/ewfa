@@ -10,24 +10,33 @@ results to Home Assistant over MQTT.
   will exit on start if no MQTT service is available.
 - Host architecture **amd64** (the add-on is amd64-only).
 
-## Companion Home Assistant config (required)
+## Companion Home Assistant config
 
-This add-on is **headless** — it only publishes/subscribes over MQTT. The HA entities and the
-Flood Watch dashboard are **not** part of the add-on; they live in the repo and must be added
-to your HA config once (the add-on won't create them):
+**The add-on's own entities are created automatically via MQTT Discovery** — the `creek_*`
+sensors and buttons (flood probability, predicted crest, lag, alert tier, pipeline/model
+status, and the Run inference / Retrain / Promote / Rollback buttons) appear under an
+**Ackerly Creek Modeling** device with no package or `configuration.yaml` edit, and they
+re-publish (so they stay current) whenever the add-on updates. An MQTT LWT flips them to
+*unavailable* when the add-on is stopped.
 
-1. **Copy** these from the [ewfa repo](https://github.com/ryanbuiltthat/ewfa) into your HA
-   config directory (via the Samba or File editor add-on):
-   - `ha-packages/creek_warning.yaml` and `ha-packages/creek_modeling.yaml` → `/config/ha-packages/`
-   - `dashboards/creek_flood_watch.yaml` → `/config/dashboards/`
-2. **Enable packages + register the dashboard** in `/config/configuration.yaml`:
+Two things still need a **one-time** manual setup (they can't come from the add-on):
+
+1. **Layer-1 package** — soil-moisture template sensors, the Tier-0 automation, and the
+   sensor-fault watchdogs. Copy `ha-packages/creek_warning.yaml` from the
+   [ewfa repo](https://github.com/ryanbuiltthat/ewfa) → `/config/ha-packages/`, and enable
+   packages in `/config/configuration.yaml`:
 
    ```yaml
    homeassistant:
      packages: !include_dir_named ha-packages
+   ```
 
+2. **Dashboard** — copy `dashboards/creek_flood_watch.yaml` → `/config/dashboards/` and
+   register it (core Lovelace, keeps your UI dashboards untouched):
+
+   ```yaml
    lovelace:
-     mode: storage            # keeps your existing UI dashboards untouched
+     mode: storage
      dashboards:
        creek-flood-watch:     # slug must contain a hyphen
          mode: yaml
@@ -37,13 +46,12 @@ to your HA config once (the add-on won't create them):
          filename: dashboards/creek_flood_watch.yaml
    ```
 
-   Both `!include_dir_named` and `filename:` are relative to the config directory. `template:`
-   and `mqtt:` merge with anything you already have, so this is additive.
-3. **Developer Tools → YAML → Check Configuration**, then **Restart**. The `creek_*` MQTT
-   sensors/buttons appear, and *Creek Flood Watch* shows in the sidebar.
+Then **Developer Tools → YAML → Check Configuration** and **Restart**. `!include_dir_named`
+and `filename:` are relative to the config directory; the package `template:` block merges
+with anything you already have.
 
-> The repo is the source of truth; the copies in `/config` are a deploy target. Re-copy after
-> pulling repo changes.
+> These two files are the source of truth in the repo; the `/config` copies are a deploy
+> target — re-copy after pulling repo changes. (The discovered entities need no re-copy.)
 
 ## Configuration
 

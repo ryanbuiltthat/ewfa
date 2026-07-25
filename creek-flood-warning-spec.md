@@ -350,8 +350,22 @@ pipeline is most useful *now*. Stock cards + the Prism theme; no custom frontend
   `creek/status/pipeline` (`state`, `task`, `last_inference_at`, `last_nightly_at`,
   `last_error`), `creek/status/registry` (active/candidate versions + metrics + history,
   `event_count`), and `creek/status/command_result` (echo of each command's outcome,
-  non-retained). Existing outputs (`creek/flood_probability`, `predicted_crest`,
-  `lag_estimate`, `model_health`) are unchanged. Timestamps are tz-aware ISO.
+  non-retained). Outputs `creek/flood_probability`, `predicted_crest`, `lag_estimate`,
+  `model_health`, and `creek/alert_tier` (tier + label, §6). Timestamps are tz-aware ISO.
+- **Availability** — `creek/status/availability` online/offline, backed by the MQTT LWT, so
+  the discovered entities go *unavailable* when the add-on stops.
+
+### B.1a Auto-provisioning via MQTT Discovery
+
+The add-on publishes retained MQTT-discovery configs
+(`homeassistant/<component>/creek_modeling/<slug>/config`) for all of its `creek_*` sensors
+and command buttons, grouped under an **Ackerly Creek Modeling** device. HA creates/updates
+them with no package or `configuration.yaml` edit, and they re-publish on every reconnect so
+they track add-on updates. This supersedes the earlier "define them in a HA package" approach
+for the add-on's own entities. Entity IDs stay stable (name-derived, e.g.
+`sensor.creek_flood_probability`) so dashboards keep working. Only genuinely HA-side entities
+remain in a package: the soil-moisture templates, the Tier-0 automation, and the sensor-fault
+watchdogs (all in `creek_warning.yaml`).
 
 ### B.2 Model registry (`/data/models/registry.json`)
 

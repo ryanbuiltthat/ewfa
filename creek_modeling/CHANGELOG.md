@@ -3,6 +3,19 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.3.0
+
+- **MQTT Discovery:** the add-on now auto-provisions its HA entities (all `creek_*` sensors
+  and the four command buttons) under an *Ackerly Creek Modeling* device — no HA package or
+  `configuration.yaml` edit for them, and they re-publish on every (re)connect so they track
+  add-on updates. Removes `ha-packages/creek_modeling.yaml`; the sensor-fault watchdogs move
+  into the Layer-1 `creek_warning.yaml`.
+- **Availability (LWT):** publishes `creek/status/availability` online/offline so discovered
+  entities show *unavailable* when the add-on stops.
+- **Alert tier in the add-on:** computes and publishes `creek/alert_tier` (`value` + `label`)
+  from probability + ponding (`app/tiers.py`), replacing the HA template. PLACEHOLDER
+  thresholds (open question #7).
+
 ## 0.2.0
 
 - **On-demand commands:** subscribes to `creek/cmd/{run_inference,retrain,promote,rollback}`

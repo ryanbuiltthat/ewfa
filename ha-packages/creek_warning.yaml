@@ -48,6 +48,46 @@ template:
           near_house_pct: "{{ states('sensor.outside_weather_station_soil_moisture_1') }}"
           near_creek_pct: "{{ states('sensor.outside_weather_station_soil_moisture_2') }}"
 
+      # Sensor-fault watchdogs (spec §4): ON = a source has gone stale/missing. These are
+      # HA-side by nature (they observe other integrations + the add-on's liveness) so they
+      # stay in this package rather than moving to add-on MQTT discovery. Each guards against
+      # the entity not existing yet (Phase 1/2) via short-circuit. sensor.creek_pipeline_state
+      # is auto-created by the add-on's MQTT discovery.
+      - name: "Creek Stage Stale"
+        unique_id: creek_stage_stale
+        device_class: problem
+        state: >
+          {% set e = states.sensor.creek_stage %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 1800 }}
+
+      - name: "Creek Soil Moisture Stale"
+        unique_id: creek_soil_moisture_stale
+        device_class: problem
+        state: >
+          {% set e = states.sensor.creek_soil_moisture_mean %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 3600 }}
+
+      - name: "Creek Rain Rate Stale"
+        unique_id: creek_rain_rate_stale
+        device_class: problem
+        state: >
+          {% set e = states.sensor.outside_weather_station_rain_rate %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 3600 }}
+
+      - name: "Creek Modeling Service Stale"
+        unique_id: creek_modeling_service_stale
+        device_class: problem
+        # The add-on publishes pipeline status every fast loop (default 5 min). No update
+        # in 15 min means the service is likely stopped or wedged. (Its MQTT LWT also flips
+        # the discovered entities to unavailable when it disconnects.)
+        state: >
+          {% set e = states.sensor.creek_pipeline_state %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 900 }}
+
 automation:
   - id: creek_tier0_advisory_placeholder
     alias: "Creek Tier 0 Advisory (placeholder)"

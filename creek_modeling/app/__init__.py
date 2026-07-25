@@ -5,4 +5,4 @@ the persistent-storage layout. The real inference/retrain logic (Phase 4) slots
 into `model.py` behind the same interfaces used here.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -29,10 +29,12 @@ add-on installs and updates entirely through the GUI; a local-add-on copy still 
 
 ## Required HA-side config
 
-The add-on is headless (MQTT only) — the `creek_*` entities and the **Creek Flood Watch**
-dashboard are not created by the add-on. Copy `ha-packages/` and `dashboards/` from this repo
-into your HA config dir and add the `homeassistant: packages:` + `lovelace: dashboards:` blocks.
-Full steps are in [DOCS.md](./DOCS.md#companion-home-assistant-config-required).
+The add-on's `creek_*` sensors and buttons are created **automatically via MQTT Discovery**
+(under an *Ackerly Creek Modeling* device) — no package or config edit, and they update with
+the add-on. Only two things need a one-time manual step: the Layer-1 package
+`ha-packages/creek_warning.yaml` (soil sensors + Tier-0 automation + watchdogs) and the
+`dashboards/creek_flood_watch.yaml` dashboard registration. Full steps are in
+[DOCS.md](./DOCS.md#companion-home-assistant-config).
 
 ## How it talks to HA
 
