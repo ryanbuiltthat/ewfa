@@ -141,12 +141,13 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 
 ### A.2 Add-on layout
 
-The add-on **source** lives in the repo at `modeling/` (per the README repo structure).
-To run it, **install** as a **local add-on**: copy that folder into the HAOS `/addons/`
-directory as `/addons/creek_modeling/` (via the Samba or SSH add-on, or `addon_config`),
-and it appears under **Settings → Add-ons → Local add-ons**. Promote to a Git-based add-on
-repository later for versioned installs. (Repo dir = `modeling/`; HAOS install target =
-`/addons/creek_modeling/` — same files, two locations.)
+The add-on **source** lives in the repo at `creek_modeling/` (per the README repo structure).
+Preferred install is via the **Git-based add-on repository** (add the repo URL in
+**Settings → Add-ons → Add-on Store → ⋮ → Repositories**), which enables GUI install and
+versioned updates. It can also run as a **local add-on**: copy that folder into the HAOS
+`/addons/` directory as `/addons/creek_modeling/` (via the Samba or SSH add-on, or
+`addon_config`), where it appears under **Settings → Add-ons → Local add-ons**. (Repo dir =
+`creek_modeling/`; local install target = `/addons/creek_modeling/` — same files.)
 
 ```text
 modeling/                # repo source (installs to HAOS /addons/creek_modeling/)

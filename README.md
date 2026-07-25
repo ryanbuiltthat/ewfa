@@ -14,10 +14,11 @@ There is no official USGS gauge on this creek. This project instruments the cree
 ## Repo structure
 
 ```
-esphome/         ESPHome firmware config for the creek sensor node
+esphome/          ESPHome firmware config for the creek sensor node
 ha-packages/      Home Assistant package YAML (sensors, templates, automations)
-modeling/         Local HA add-on: nightly dataset builder + prediction service
+creek_modeling/   HA add-on: nightly dataset builder + prediction service
 docs/             Project docs, including open questions and decisions log
+repository.yaml   Marks the repo as an installable HA add-on store
 creek-flood-warning-spec.md   Source-of-truth project specification
 ```
 

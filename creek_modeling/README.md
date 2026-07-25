@@ -4,17 +4,28 @@ Layer 2 of the [Ackerly Creek Flood Early-Warning System](../creek-flood-warning
 Runs the flood-probability + predicted-stage inference (fast loop) and the nightly
 retrain/recalibrate batch, publishing results to Home Assistant over MQTT.
 
-Resolves Open Question #1 — HA install is HAOS, so Layer 2 ships as a **local add-on**
-(see Addendum A in the spec).
+Resolves Open Question #1 — HA install is HAOS, so Layer 2 ships as a Supervisor add-on.
+The repo doubles as a **Git-based add-on store** (`repository.yaml` at the repo root), so the
+add-on installs and updates entirely through the GUI; a local-add-on copy still works offline.
 
-## Install (local add-on)
+## Install via repository (GUI, recommended)
+
+1. **Settings → Add-ons → Add-on Store →** ⋮ (top-right) **→ Repositories**, paste
+   `https://github.com/ryanbuiltthat/ewfa`, and **Add**.
+2. The **Ackerly Creek Modeling** card appears in the store. Open it and **Install**
+   (first install builds the Debian image on the host — amd64 only).
+3. Set options (API keys, entity IDs, thresholds) on the **Configuration** tab, then
+   **Start**. Requires the **Mosquitto broker** add-on (declared `mqtt:need`).
+4. Updates: bump `version` in `config.yaml` upstream; the GUI shows an **Update** button
+   after **⋮ → Check for updates**.
+
+## Install as a local add-on (offline fallback)
 
 1. Copy this folder to the HAOS `/addons/` directory (via the Samba or SSH & Web Terminal
    add-on): `/addons/creek_modeling/`.
 2. **Settings → Add-ons → Add-on Store → ⋮ → Check for updates**. The add-on appears
    under **Local add-ons**.
-3. Open it, set options (API keys, entity IDs, thresholds) on the **Configuration** tab,
-   then **Start**. Requires the **Mosquitto broker** add-on (declared `mqtt:need`).
+3. Open it, set options on the **Configuration** tab, then **Start**.
 
 ## How it talks to HA
 
