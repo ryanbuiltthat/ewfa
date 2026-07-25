@@ -1,0 +1,205 @@
+# Home Assistant package — Layer 2 add-on interface (spec Addendum B: dashboard + commands).
+# Load via configuration.yaml (same include as creek_warning.yaml):
+#   homeassistant:
+#     packages: !include_dir_named ha-packages
+#
+# Defines the HA-side entities the `creek_modeling` add-on talks to over MQTT:
+#   - sensors bound to the add-on's output + status topics (creek/*, creek/status/*)
+#   - button entities that publish to creek/cmd/* (Run inference / Retrain / Promote / Rollback)
+#   - a placeholder alert-tier template sensor (household view centerpiece)
+#   - sensor-fault "stale" watchdogs (spec §4) for the ingested sources
+#
+# Requires the Mosquitto broker add-on + HA MQTT integration. Base MQTT topic is `creek`
+# (the add-on's `mqtt_base_topic` option); change both together if you retopic.
+
+mqtt:
+  sensor:
+    # --- Model outputs (published every fast loop) ---------------------------
+    - name: "Creek Flood Probability"
+      unique_id: creek_flood_probability
+      state_topic: "creek/flood_probability"
+      # Add-on publishes 0..1; surface as a 0..100% for gauges.
+      value_template: "{{ (value_json.value | float(0) * 100) | round(0) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      json_attributes_topic: "creek/flood_probability"   # exposes `method`
+      icon: mdi:water-alert
+
+    - name: "Creek Model Method"
+      unique_id: creek_model_method
+      state_topic: "creek/flood_probability"
+      value_template: "{{ value_json.method }}"
+      icon: mdi:function-variant
+
+    - name: "Creek Predicted Crest"
+      unique_id: creek_predicted_crest
+      state_topic: "creek/predicted_crest"
+      # null until the lag/response fit lands (Phase 3) -> show as unknown, not 0.
+      value_template: "{{ value_json.value if value_json.value is not none else 'unknown' }}"
+      unit_of_measurement: "ft"
+      state_class: measurement
+      icon: mdi:wave
+
+    - name: "Creek Lag Estimate"
+      unique_id: creek_lag_estimate
+      state_topic: "creek/lag_estimate"
+      value_template: "{{ value_json.value if value_json.value is not none else 'unknown' }}"
+      unit_of_measurement: "min"
+      state_class: measurement
+      icon: mdi:timer-sand
+
+    # --- Pipeline status ----------------------------------------------------
+    - name: "Creek Pipeline State"
+      unique_id: creek_pipeline_state
+      state_topic: "creek/status/pipeline"
+      value_template: "{{ value_json.state }}"      # idle | running
+      json_attributes_topic: "creek/status/pipeline"  # task, last_*_at, last_error
+      icon: mdi:cog-play
+
+    # last_inference_at / last_nightly_at are naive local ISO strings from the add-on,
+    # so they're plain sensors (not device_class: timestamp, which needs tz-aware ISO).
+    - name: "Creek Last Inference"
+      unique_id: creek_last_inference
+      state_topic: "creek/status/pipeline"
+      value_template: "{{ value_json.last_inference_at if value_json.last_inference_at is not none else 'never' }}"
+      icon: mdi:clock-check-outline
+
+    - name: "Creek Last Nightly Run"
+      unique_id: creek_last_nightly
+      state_topic: "creek/status/pipeline"
+      value_template: "{{ value_json.last_nightly_at if value_json.last_nightly_at is not none else 'never' }}"
+      icon: mdi:weather-night
+
+    - name: "Creek Last Command"
+      unique_id: creek_last_command
+      state_topic: "creek/status/command_result"
+      value_template: "{{ value_json.command }} ({{ 'ok' if value_json.ok else 'failed' }})"
+      json_attributes_topic: "creek/status/command_result"  # message, ts
+      icon: mdi:console
+
+    # --- Model health / registry -------------------------------------------
+    - name: "Creek Model Health"
+      unique_id: creek_model_health
+      state_topic: "creek/model_health"
+      value_template: "{{ value_json.active_method }}"     # threshold | ml
+      json_attributes_topic: "creek/model_health"
+      icon: mdi:heart-pulse
+
+    - name: "Creek Dataset Rows"
+      unique_id: creek_dataset_rows
+      state_topic: "creek/model_health"
+      value_template: "{{ value_json.dataset_rows }}"
+      state_class: measurement
+      icon: mdi:table
+
+    - name: "Creek Event Count"
+      unique_id: creek_event_count
+      # From the registry topic (published at startup + on change), fresher than model_health.
+      state_topic: "creek/status/registry"
+      value_template: "{{ value_json.event_count }}"
+      state_class: measurement
+      icon: mdi:weather-lightning-rainy
+
+    - name: "Creek Active Model"
+      unique_id: creek_active_model
+      state_topic: "creek/status/registry"
+      value_template: "{{ value_json.active_version if value_json.active_version is not none else 'none' }}"
+      json_attributes_topic: "creek/status/registry"  # active/candidate metrics + history
+      icon: mdi:cube-outline
+
+    - name: "Creek Candidate Model"
+      unique_id: creek_candidate_model
+      state_topic: "creek/status/registry"
+      value_template: "{{ value_json.candidate_version if value_json.candidate_version is not none else 'none' }}"
+      icon: mdi:cube-scan
+
+  button:
+    # Publish to creek/cmd/<name>; the add-on keys off the trailing topic segment,
+    # so payload_press is irrelevant (kept as a readable marker).
+    - name: "Creek Run Inference Now"
+      unique_id: creek_cmd_run_inference
+      command_topic: "creek/cmd/run_inference"
+      payload_press: "run"
+      icon: mdi:play
+
+    - name: "Creek Retrain Now"
+      unique_id: creek_cmd_retrain
+      command_topic: "creek/cmd/retrain"
+      payload_press: "run"
+      icon: mdi:brain
+
+    - name: "Creek Promote Model"
+      unique_id: creek_cmd_promote
+      command_topic: "creek/cmd/promote"
+      payload_press: "run"
+      icon: mdi:arrow-up-bold-box
+
+    - name: "Creek Rollback Model"
+      unique_id: creek_cmd_rollback
+      command_topic: "creek/cmd/rollback"
+      payload_press: "run"
+      icon: mdi:undo-variant
+
+template:
+  - sensor:
+      # Household-view centerpiece. PLACEHOLDER mapping of model probability -> tier
+      # (spec §6). Thresholds are UNCALIBRATED (open question #7) and will fold in stage +
+      # rate-of-rise once the ESPHome creek node is reporting. Not a live alert yet.
+      - name: "Creek Alert Tier"
+        unique_id: creek_alert_tier
+        icon: mdi:alert-decagram
+        state: >
+          {% set p = states('sensor.creek_flood_probability') | float(0) %}
+          {% set ponding = is_state('binary_sensor.creek_soil_ponding', 'on') %}
+          {% if p >= 80 %} 3
+          {% elif p >= 50 %} 2
+          {% elif p >= 20 or ponding %} 1
+          {% else %} 0
+          {% endif %}
+        attributes:
+          label: >
+            {% set p = states('sensor.creek_flood_probability') | float(0) %}
+            {% set ponding = is_state('binary_sensor.creek_soil_ponding', 'on') %}
+            {% if p >= 80 %} Emergency
+            {% elif p >= 50 %} Warning
+            {% elif p >= 20 or ponding %} Watch
+            {% else %} All-clear
+            {% endif %}
+
+  - binary_sensor:
+      # Sensor-fault watchdogs (spec §4): ON = a source has gone stale/missing. Each guards
+      # against the entity not existing yet (Phase 1/2) via short-circuit, so a missing entity
+      # reads as a problem rather than erroring the template.
+      - name: "Creek Stage Stale"
+        unique_id: creek_stage_stale
+        device_class: problem
+        state: >
+          {% set e = states.sensor.creek_stage %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 1800 }}
+
+      - name: "Creek Soil Moisture Stale"
+        unique_id: creek_soil_moisture_stale
+        device_class: problem
+        state: >
+          {% set e = states.sensor.creek_soil_moisture_mean %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 3600 }}
+
+      - name: "Creek Rain Rate Stale"
+        unique_id: creek_rain_rate_stale
+        device_class: problem
+        state: >
+          {% set e = states.sensor.outside_weather_station_rain_rate %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 3600 }}
+
+      - name: "Creek Modeling Service Stale"
+        unique_id: creek_modeling_service_stale
+        device_class: problem
+        # The add-on publishes pipeline status every fast loop (default 5 min). No update
+        # in 15 min means the service is likely stopped or wedged.
+        state: >
+          {% set e = states.sensor.creek_pipeline_state %}
+          {{ e is none or e.state in ['unknown', 'unavailable']
+             or (now() - e.last_changed).total_seconds() > 900 }}
