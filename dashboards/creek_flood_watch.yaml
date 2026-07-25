@@ -202,10 +202,10 @@ views:
           - entity: sensor.outside_weather_station_soil_moisture_2
             name: Soil — near creek
             secondary_info: last-changed
-          - entity: sensor.outside_weather_station_rain_rate
+          - entity: sensor.weather_station_rain_rate
             name: Rain rate
             secondary_info: last-changed
-          - entity: sensor.outside_weather_station_daily_rain
+          - entity: sensor.weather_station_daily_rain
             name: Rain today
             secondary_info: last-changed
 

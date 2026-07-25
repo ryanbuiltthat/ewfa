@@ -38,8 +38,8 @@ options:
     - sensor.outside_weather_station_soil_moisture_1
     # WH51 #2 — furthest from house, closest to the creek (low-lying, ponds early)
     - sensor.outside_weather_station_soil_moisture_2
-  onsite_rain_rate_entity: sensor.outside_weather_station_rain_rate
-  onsite_rain_daily_entity: sensor.outside_weather_station_daily_rain
+  onsite_rain_rate_entity: sensor.weather_station_rain_rate
+  onsite_rain_daily_entity: sensor.weather_station_daily_rain
 
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)

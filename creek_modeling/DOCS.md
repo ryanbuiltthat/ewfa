@@ -71,8 +71,8 @@ Set these on the **Configuration** tab.
 | `upstream_pws_ids` | `[]` | Optional upstream PWS station IDs |
 | `stage_entity` | `sensor.creek_stage` | Creek node (ESPHome) level — set to the real entity |
 | `soil_moisture_entities` | WH51 #1, #2 | `..._soil_moisture_1` (near house / willow), `_2` (near creek) |
-| `onsite_rain_rate_entity` | `sensor.outside_weather_station_rain_rate` | Ecowitt |
-| `onsite_rain_daily_entity` | `sensor.outside_weather_station_daily_rain` | Ecowitt |
+| `onsite_rain_rate_entity` | `sensor.weather_station_rain_rate` | Ecowitt |
+| `onsite_rain_daily_entity` | `sensor.weather_station_daily_rain` | Ecowitt |
 
 ## How it talks to Home Assistant
 
