@@ -39,7 +39,9 @@ def _handle_sigterm(_signum, _frame):
 
 
 def _now_iso() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    # tz-aware local time so HA can consume last_inference_at / last_nightly_at /
+    # ran_at as proper `device_class: timestamp` sensors.
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _publish_pipeline(mqtt: MqttClient, status: dict, state: str, task: str) -> None:

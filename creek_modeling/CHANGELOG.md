@@ -8,7 +8,8 @@ The version matches `version:` in `config.yaml`; bump it to trigger the GUI Upda
 - **On-demand commands:** subscribes to `creek/cmd/{run_inference,retrain,promote,rollback}`
   so the HA dashboard can drive the pipeline. Commands execute on the service's single
   thread (no overlapping runs) and are honored within a few seconds.
-- **Status publishing:** new `creek/status/pipeline` (state/task/last-run/last-error),
+- **Status publishing:** timestamps are tz-aware ISO (proper HA `timestamp` sensors);
+  new `creek/status/pipeline` (state/task/last-run/last-error),
   `creek/status/registry` (active/candidate/history + metrics), and
   `creek/status/command_result` (echo of each command's outcome).
 - **Model registry** (`app/registry.py`): real `models/registry.json` schema with working

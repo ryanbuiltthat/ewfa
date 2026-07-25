@@ -56,18 +56,20 @@ mqtt:
       json_attributes_topic: "creek/status/pipeline"  # task, last_*_at, last_error
       icon: mdi:cog-play
 
-    # last_inference_at / last_nightly_at are naive local ISO strings from the add-on,
-    # so they're plain sensors (not device_class: timestamp, which needs tz-aware ISO).
+    # The add-on emits tz-aware ISO, so these are proper timestamp sensors. Return `none`
+    # (not a string) before the first run so the sensor reads unknown rather than erroring.
     - name: "Creek Last Inference"
       unique_id: creek_last_inference
       state_topic: "creek/status/pipeline"
-      value_template: "{{ value_json.last_inference_at if value_json.last_inference_at is not none else 'never' }}"
+      device_class: timestamp
+      value_template: "{{ value_json.last_inference_at if value_json.last_inference_at is not none else none }}"
       icon: mdi:clock-check-outline
 
     - name: "Creek Last Nightly Run"
       unique_id: creek_last_nightly
       state_topic: "creek/status/pipeline"
-      value_template: "{{ value_json.last_nightly_at if value_json.last_nightly_at is not none else 'never' }}"
+      device_class: timestamp
+      value_template: "{{ value_json.last_nightly_at if value_json.last_nightly_at is not none else none }}"
       icon: mdi:weather-night
 
     - name: "Creek Last Command"

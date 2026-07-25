@@ -27,7 +27,8 @@ log = logging.getLogger("app.registry")
 
 
 def _now() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    # tz-aware to match the service's timestamp convention (see __main__._now_iso).
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 class RegistryError(RuntimeError):
