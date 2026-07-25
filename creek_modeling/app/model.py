@@ -8,13 +8,12 @@ artifact; the caller interface does not change.
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 from .config import Config
 from .features import FeatureRow
+from .registry import ModelRegistry
 
 log = logging.getLogger("app.model")
 
@@ -28,30 +27,24 @@ class Prediction:
 
 
 class Model:
-    def __init__(self, cfg: Config, data_dir: Path):
+    def __init__(self, cfg: Config, registry: ModelRegistry):
         self._cfg = cfg
-        self._registry_path = data_dir / "models" / "registry.json"
+        # Share the one registry instance the service owns, so a promote/rollback
+        # command is visible here on the next prediction without a reload race.
+        self._registry = registry
         self._artifact = self._load_promoted()
 
     def _load_promoted(self):
         """Load the promoted ML artifact if the registry names one; else None."""
-        try:
-            reg = json.loads(self._registry_path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
+        version = self._registry.active_version
+        if not version:
             return None
-        promoted = reg.get("promoted")
-        if not promoted:
-            return None
-        # Phase 4: actually load models/<promoted>.pkl here.
-        log.info("Registry names promoted artifact %s (loading deferred to Phase 4)", promoted)
+        # Phase 4: actually load models/<version>.pkl here.
+        log.info("Registry active artifact %s (loading deferred to Phase 4)", version)
         return None
 
     def event_count(self) -> int:
-        try:
-            reg = json.loads(self._registry_path.read_text(encoding="utf-8"))
-            return int(reg.get("event_count", 0))
-        except FileNotFoundError:
-            return 0
+        return self._registry.event_count
 
     def predict(self, row: FeatureRow) -> Prediction:
         if self._artifact is not None and self.event_count() >= self._cfg.min_events_for_ml:
