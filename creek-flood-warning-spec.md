@@ -22,7 +22,7 @@
 | ESP32-C6 | Creek node MCU, ESPHome, WiFi to outdoor AP on back deck | On hand |
 | SparkFun LiPo fuel gauge + Adafruit solar/DC charger + panel + LiPo | Creek node power | On hand |
 | Ecowitt weather station (uploads to Weather Underground) | On-site rain, temp, wind | Installed |
-| Ecowitt WH51 soil moisture ×2 | Antecedent wetness | **Ordered** |
+| Ecowitt WH51 soil moisture ×2 | Antecedent wetness | **Installed (×2)** |
 | Aluminum pole on large cherry tree at water's edge, guy-wired above | Sensor mount | To build |
 | Submersible pressure transducer (4–20 mA, stilling pipe) | Dissimilar-redundancy backup level sensor | Future phase |
 | Creek camera (solar WiFi or PoE) | Visual confirmation, storm archive | Future phase |
@@ -61,7 +61,7 @@
 [HA automations] --> alert tiers --> mobile notifications / TTS / etc.
 ```
 
-**Layer 1 — HA package** (`packages/creek_warning.yaml`): ESPHome entities, REST sensors per API, template sensors (rate-of-rise in/min, 1/6/24/72-h rain accumulations, Antecedent Precipitation Index), alert automations, sensor-fault watchdogs (stale data, radar/pressure divergence when transducer added).
+**Layer 1 — HA package** (`ha-packages/creek_warning.yaml`): ESPHome entities, REST sensors per API, template sensors (rate-of-rise in/min, 1/6/24/72-h rain accumulations, Antecedent Precipitation Index), alert automations, sensor-fault watchdogs (stale data, radar/pressure divergence when transducer added).
 
 **Layer 2 — Modeling service** (Python, containerized as a **local Home Assistant add-on** — HA install is HAOS; see [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1)):
 - **Fast loop (5 min):** compute flood probability + predicted stage from live features; publish via MQTT.
@@ -92,10 +92,12 @@ Each tier maps to escalating HA actions (notification → persistent alarm → w
 ## 7. Phases & Deliverables
 
 **Phase 1 — Instrument (weekend 1–2):**
-ESPHome YAML for creek node (SEN0676 Modbus, power telemetry, adaptive reporting); pole/arm install per §2 geometry; WH51 probes into Ecowitt; verify long-term statistics recording in HA.
+ESPHome YAML for creek node (SEN0676 Modbus, power telemetry, adaptive reporting); pole/arm install per §2 geometry; ~~WH51 probes into Ecowitt~~ **done (×2 installed)**; verify long-term statistics recording in HA.
+
+- **Follow-up:** Confirm WH51 entities appear in HA via the Ecowitt integration and are captured in recorder long-term statistics (check `state_class`); these feed the nightly dataset builder.
 
 **Phase 2 — Ingest (weeks 1–4, parallel):**
-`packages/creek_warning.yaml` with all REST sensors; enumerate upstream WU station IDs; resolve NWM reach ID; register Google Floods API and run `searchGaugesByArea` over the watershed; SNODAS fetch; data-quality watchdogs.
+`ha-packages/creek_warning.yaml` with all REST sensors; enumerate upstream WU station IDs; resolve NWM reach ID; register Google Floods API and run `searchGaugesByArea` over the watershed; SNODAS fetch; data-quality watchdogs.
 
 **Phase 3 — Collect & correlate (months 1–3):**
 Nightly dataset builder; storm event log (annotated); first lag/response estimates; threshold-based Tier 2/3 alerts live (conservative values); downstream-gauge sanity comparisons.
@@ -113,6 +115,7 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 - HA config as packages under version control; secrets via `secrets.yaml` / HA credentials — never committed.
 - Modeling service: Python 3.11+, packaged as a **local HAOS add-on** (`config.yaml` + `Dockerfile` + `run.sh`), data in Parquet + SQLite under `/data`, MQTT for HA interface. See [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1).
 - Every automation that can wake the family must be testable via a dry-run script/service.
+- Frontend: any custom Lovelace cards / flood dashboard follow the HA design system — design tokens (no hardcoded colors), light/dark parity, WCAG AA contrast, `<ha-card>` + MDI icons, responsive breakpoints. Ref: <https://design.home-assistant.io/>. (No frontend exists yet; applies when the dashboard/cards land — see Phase 5. Reuse the Prism theme where possible.)
 
 ## 9. Open Questions (resolve in Phase 1–2)
 
@@ -122,6 +125,7 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 4. Which 3–5 upstream PWS stations are reliable (uptime, tipping-bucket quality)?
 5. Exact low-water reference datum and surveyed bank height at the sensor site (measure at install).
 6. WiFi RSSI at the pole via the outdoor AP (bag test before final mount).
+7. WH51 readings are relative (0–100%) and site-specific. After the next soaking rain and a dry stretch, record the empirical "saturated" and "dry" values at each burial spot; these calibrate the Tier 0 soil-moisture threshold.
 
 ---
 
@@ -135,22 +139,31 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 - The Supervisor provides, for free, exactly the plumbing this service needs: an authenticated **proxy to the HA Core API** (no long-lived token to mint or rotate), **MQTT service discovery** (broker host/credentials injected at runtime), managed lifecycle (auto-start, restart, logs, watchdog), and a **persistent `/data` volume** that survives add-on updates.
 - Config UI comes for free: the `schema` block renders a form in **Settings → Add-ons**, so API keys and thresholds are edited in the HA UI instead of a `.env` file. This is a natural stepping-stone toward the Layer 3 HACS integration's config flow (§4).
 
-### A.2 Add-on repository layout
+### A.2 Add-on layout
 
-Develop as a **local add-on** first: drop the folder into the HAOS `/addons` directory (via the Samba or SSH add-on, or `addon_config`), and it appears under **Settings → Add-ons → Local add-ons**. Promote to a Git-based add-on repository later for versioned installs.
+The add-on **source** lives in the repo at `modeling/` (per the README repo structure).
+To run it, **install** as a **local add-on**: copy that folder into the HAOS `/addons/`
+directory as `/addons/creek_modeling/` (via the Samba or SSH add-on, or `addon_config`),
+and it appears under **Settings → Add-ons → Local add-ons**. Promote to a Git-based add-on
+repository later for versioned installs. (Repo dir = `modeling/`; HAOS install target =
+`/addons/creek_modeling/` — same files, two locations.)
 
 ```text
-/addons/creek_modeling/
+modeling/                # repo source (installs to HAOS /addons/creek_modeling/)
 ├── config.yaml          # add-on manifest + options schema
+├── build.yaml           # per-arch BUILD_FROM (Debian base)
 ├── Dockerfile           # build recipe (HA base image + Python deps)
 ├── run.sh               # entrypoint (bashio: read options, export env, exec service)
 ├── requirements.txt     # pandas, pyarrow, xgboost/lightgbm, paho-mqtt, requests, ...
 ├── icon.png / logo.png  # optional, for the add-on store card
 └── app/                 # the modeling service itself
     ├── __main__.py      # fast loop (5 min) + nightly batch scheduler
+    ├── config.py        # options.json + env loader
     ├── features.py      # feature builders (rate-of-rise, APIndex, accumulations)
     ├── model.py         # train / infer / registry
-    └── ha.py            # HA Core API + MQTT clients
+    ├── dataset.py       # Parquet feature rows + SQLite storm-event log
+    ├── ha.py            # HA Core API client (Supervisor proxy)
+    └── mqtt_client.py   # MQTT publisher for model outputs
 ```
 
 ### A.3 `config.yaml` manifest (with options schema)

@@ -1,0 +1,80 @@
+"""Feature builders.
+
+Phase 2 computes the cheap live features the threshold-based alerting needs
+(current stage, rate-of-rise, soil moisture). The richer feature set from spec
+§5 (multi-window rain accumulations, API, QPF, NWM, SNODAS SWE, rain-on-snow)
+lands in Phase 3/4 and appends to the same feature rows.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import asdict, dataclass
+
+from .config import Config
+from .ha import HAClient
+
+log = logging.getLogger("app.features")
+
+
+@dataclass
+class FeatureRow:
+    ts: float                       # unix seconds
+    stage_ft: float | None          # current creek stage
+    rate_of_rise_in_min: float | None
+    soil_moisture_mean_pct: float | None
+    soil_moisture_near_house_pct: float | None   # WH51 #1, willow tree
+    soil_moisture_near_creek_pct: float | None   # WH51 #2, closest to creek
+    ponding_flag: bool              # low-lying sensors saturated -> fast runoff
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+# Above this soil-moisture reading the low-lying areas are effectively saturated
+# and "pond", shortening the rainfall->runoff response. Tune with observed storms.
+PONDING_SATURATION_PCT = 85.0
+
+
+class FeatureBuilder:
+    def __init__(self, cfg: Config, ha: HAClient):
+        self._cfg = cfg
+        self._ha = ha
+        self._last_stage: tuple[float, float] | None = None  # (ts, stage_ft)
+
+    def _rate_of_rise(self, ts: float, stage_ft: float | None) -> float | None:
+        """Inches per minute since the previous sample; None on first/invalid."""
+        if stage_ft is None:
+            return None
+        prev = self._last_stage
+        self._last_stage = (ts, stage_ft)
+        if prev is None:
+            return None
+        prev_ts, prev_stage = prev
+        dt_min = (ts - prev_ts) / 60.0
+        if dt_min <= 0:
+            return None
+        return (stage_ft - prev_stage) * 12.0 / dt_min
+
+    def build(self) -> FeatureRow:
+        ts = time.time()
+        stage_ft = self._ha.get_float(self._cfg.stage_entity)
+
+        soils = [self._ha.get_float(e) for e in self._cfg.soil_moisture_entities]
+        near_house = soils[0] if len(soils) >= 1 else None
+        near_creek = soils[1] if len(soils) >= 2 else None
+        present = [s for s in soils if s is not None]
+        soil_mean = sum(present) / len(present) if present else None
+        ponding = any(s >= PONDING_SATURATION_PCT for s in present)
+
+        row = FeatureRow(
+            ts=ts,
+            stage_ft=stage_ft,
+            rate_of_rise_in_min=self._rate_of_rise(ts, stage_ft),
+            soil_moisture_mean_pct=soil_mean,
+            soil_moisture_near_house_pct=near_house,
+            soil_moisture_near_creek_pct=near_creek,
+            ponding_flag=ponding,
+        )
+        log.debug("Built feature row: %s", row)
+        return row

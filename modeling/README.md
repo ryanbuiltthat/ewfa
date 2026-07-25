@@ -1,0 +1,73 @@
+# Ackerly Creek Modeling (HAOS add-on)
+
+Layer 2 of the [Ackerly Creek Flood Early-Warning System](../creek-flood-warning-spec.md).
+Runs the flood-probability + predicted-stage inference (fast loop) and the nightly
+retrain/recalibrate batch, publishing results to Home Assistant over MQTT.
+
+Resolves Open Question #1 — HA install is HAOS, so Layer 2 ships as a **local add-on**
+(see Addendum A in the spec).
+
+## Install (local add-on)
+
+1. Copy this folder to the HAOS `/addons/` directory (via the Samba or SSH & Web Terminal
+   add-on): `/addons/creek_modeling/`.
+2. **Settings → Add-ons → Add-on Store → ⋮ → Check for updates**. The add-on appears
+   under **Local add-ons**.
+3. Open it, set options (API keys, entity IDs, thresholds) on the **Configuration** tab,
+   then **Start**. Requires the **Mosquitto broker** add-on (declared `mqtt:need`).
+
+## How it talks to HA
+
+- **Reads** entity states through the Supervisor proxy at `http://supervisor/core/api`,
+  authenticated by the injected `SUPERVISOR_TOKEN` — no long-lived token needed
+  (`homeassistant_api: true`).
+- **Writes** `creek/flood_probability`, `creek/predicted_crest`, `creek/lag_estimate`,
+  and `creek/model_health` over MQTT (broker from service discovery). Add matching HA
+  MQTT sensors to surface them as entities for the alert automations.
+
+## Inputs
+
+| Option | Default | Notes |
+|---|---|---|
+| `stage_entity` | `sensor.creek_stage` | Creek node (ESPHome) level — set to the real entity |
+| `soil_moisture_entities` | WH51 #1, #2 | `sensor.outside_weather_station_soil_moisture_1` (near house / willow), `_2` (near creek) — both low-lying, pond early |
+| `onsite_rain_rate_entity` | `sensor.outside_weather_station_rain_rate` | Ecowitt |
+| `onsite_rain_daily_entity` | `sensor.outside_weather_station_daily_rain` | Ecowitt |
+| `min_events_for_ml` | `10` | Stay on threshold model until ≥ N storms captured |
+
+## Model features (spec §5)
+
+Features the nightly dataset builder records per row and the model consumes. Live subset
+today; the rest fill in through Phase 3/4 as sources come online.
+
+- **Creek stage** (`stage_entity`) and **rate-of-rise** (in/min, derived).
+- **Soil moisture — antecedent wetness** (Ecowitt WH51 ×2, both in low-lying, early-ponding
+  spots): `sensor.outside_weather_station_soil_moisture_1` (near house / willow) and
+  `sensor.outside_weather_station_soil_moisture_2` (near creek). Recorded individually plus
+  a mean and a `ponding_flag`. **Note:** WH51 readings are relative (0–100%) and
+  site-specific — see open question #7; the saturated/dry endpoints need field calibration
+  before the ponding threshold and Tier 0 condition are meaningful.
+- **Rainfall** — on-site rate/daily (Ecowitt) and upstream PWS accumulations (1/3/6/24/72 h).
+- **Forecast/model** — QPF (next 6/24 h), NWM reach forecast, Google flood status.
+- **Context** — SNODAS SWE, temperature (rain-on-snow flag), season.
+
+## Persistent storage (`/data`)
+
+```text
+/data/datasets/dataset.parquet   nightly-appended feature/label rows
+/data/events.sqlite              annotated storm event log
+/data/models/registry.json       versioned artifacts + skill metrics
+```
+
+## Status
+
+Phase 2 **skeleton**: validates the Supervisor proxy + MQTT wiring, builds live
+features (stage, rate-of-rise, soil moisture + ponding flag), and returns a
+transparent conservative **threshold** estimate. Gradient-boosting inference and
+nightly retrain land in Phase 4 behind the same interfaces (`app/model.py`).
+
+## Local dev (outside HAOS)
+
+`app/` runs on any Python 3.11+. With no `/data/options.json` present it falls back to
+env-only config; point `HA_API_URL`/`SUPERVISOR_TOKEN` at a dev HA and `MQTT_*` at a
+broker to smoke-test.

@@ -1,0 +1,10 @@
+# Runtime deps for the Ackerly Creek modeling service.
+# Kept lean for the Phase 2 skeleton; ML libs are declared now so Phase 4 needs no rebuild.
+requests>=2.31
+paho-mqtt>=2.1
+pandas>=2.2
+pyarrow>=16.0
+numpy>=1.26
+# --- Modeling (Phase 4); harmless to install early on amd64/Debian ---
+scikit-learn>=1.5
+xgboost>=2.1

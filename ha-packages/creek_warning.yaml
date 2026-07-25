@@ -1,0 +1,83 @@
+# Home Assistant package — Ackerly Creek flood early-warning (Layer 1, spec §4).
+# Load via configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named ha-packages
+#
+# STARTER SCOPE: WH51 soil-moisture template sensors + a Tier 0 Advisory placeholder.
+# REST sensors (NWS QPF / NWPS / USGS / WU PWS / SNODAS), rate-of-rise, multi-window rain
+# accumulations, the Antecedent Precipitation Index, and Tier 1–3 automations (spec §4/§6)
+# are added in Phase 2+. Placeholder thresholds are marked and MUST be calibrated.
+
+template:
+  - sensor:
+      - name: "Creek Soil Moisture Mean"
+        unique_id: creek_soil_moisture_mean
+        unit_of_measurement: "%"
+        state_class: measurement
+        device_class: moisture
+        # Mean of the two WH51 probes (near-house/willow + near-creek), ignoring any
+        # probe that is momentarily unavailable.
+        state: >
+          {% set a = states('sensor.outside_weather_station_soil_moisture_1') | float(none) %}
+          {% set b = states('sensor.outside_weather_station_soil_moisture_2') | float(none) %}
+          {% set vals = [a, b] | reject('none') | list %}
+          {{ ((vals | sum) / (vals | count)) | round(1) if vals | count > 0 else none }}
+        availability: >
+          {{ has_value('sensor.outside_weather_station_soil_moisture_1')
+             or has_value('sensor.outside_weather_station_soil_moisture_2') }}
+
+  - binary_sensor:
+      - name: "Creek Soil Ponding"
+        unique_id: creek_soil_ponding
+        device_class: moisture
+        # Low-lying burial spots saturate/pond faster than the rest of the property,
+        # shortening the rainfall->runoff response. ON when either probe is "saturated".
+        # PLACEHOLDER threshold (85%) — calibrate the empirical saturated value per
+        # open question #7 before relying on this.
+        state: >
+          {% set thresh = 85 %}
+          {% set a = states('sensor.outside_weather_station_soil_moisture_1') | float(0) %}
+          {% set b = states('sensor.outside_weather_station_soil_moisture_2') | float(0) %}
+          {{ a >= thresh or b >= thresh }}
+        # Unavailable (not a false "dry") when both probes are missing; a separate
+        # stale-data watchdog (spec §4) handles the alerting on that.
+        availability: >
+          {{ has_value('sensor.outside_weather_station_soil_moisture_1')
+             or has_value('sensor.outside_weather_station_soil_moisture_2') }}
+        attributes:
+          near_house_pct: "{{ states('sensor.outside_weather_station_soil_moisture_1') }}"
+          near_creek_pct: "{{ states('sensor.outside_weather_station_soil_moisture_2') }}"
+
+automation:
+  - id: creek_tier0_advisory_placeholder
+    alias: "Creek Tier 0 Advisory (placeholder)"
+    description: >-
+      PLACEHOLDER per spec §6 Tier 0: forecast risk = QPF >= X" in 24 h AND soil
+      moisture >= Y%. Both thresholds are UNCONFIRMED — the NWS QPF REST sensor is
+      wired in Phase 2, and the soil threshold is pending field calibration
+      (open question #7). Left enabled but effectively inert until sensor.nws_qpf_24h
+      exists; treat as a wiring stub, not a live alert.
+    triggers:
+      - trigger: state
+        entity_id: sensor.creek_soil_moisture_mean
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.creek_soil_moisture_mean
+        above: 70                    # PLACEHOLDER Y% — calibrate (open question #7)
+      # QPF gate via has_value guard so this stays silent (no log spam) until the
+      # NWS QPF REST sensor exists in Phase 2. TODO(Phase 2): sensor.nws_qpf_24h.
+      - condition: template
+        value_template: >
+          {{ has_value('sensor.nws_qpf_24h')
+             and states('sensor.nws_qpf_24h') | float(0) >= 1.0 }}
+                                       # PLACEHOLDER X inches / 24 h
+    actions:
+      - action: persistent_notification.create
+        data:
+          notification_id: creek_tier0_advisory
+          title: "Creek Advisory (Tier 0)"
+          message: >-
+            Elevated flood risk: antecedent soil moisture
+            {{ states('sensor.creek_soil_moisture_mean') }}% with significant forecast
+            rain. (Placeholder thresholds — not yet calibrated.)
+    mode: single
