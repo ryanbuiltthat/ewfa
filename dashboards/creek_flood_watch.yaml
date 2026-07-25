@@ -14,7 +14,7 @@
 # Stock cards only (gauge / history-graph / entities / markdown / button), styled by the
 # Prism theme. Requires the Layer-2 package (ha-packages/creek_modeling.yaml) for the
 # creek_* MQTT entities and the creek_modeling add-on to be running. Entities that don't
-# exist yet (e.g. sensor.creek_stage before the ESPHome node is live) degrade gracefully.
+# exist yet (e.g. sensor.ackerly_creek_modeling_creek_stage before the ESPHome node is live) degrade gracefully.
 #
 # NOTE: `theme: Prism` assumes that theme is installed under that exact name — adjust or
 # remove the theme keys if yours differs.
@@ -30,13 +30,13 @@ views:
     cards:
       - type: markdown
         content: >
-          # {{ state_attr('sensor.creek_alert_tier', 'label') or 'Unknown' }}
+          # {{ state_attr('sensor.ackerly_creek_modeling_creek_alert_tier', 'label') or 'Unknown' }}
 
-          **Tier {{ states('sensor.creek_alert_tier') }}** · flood probability
-          **{{ states('sensor.creek_flood_probability') }}%**
-          ({{ states('sensor.creek_model_method') }} model)
+          **Tier {{ states('sensor.ackerly_creek_modeling_creek_alert_tier') }}** · flood probability
+          **{{ states('sensor.ackerly_creek_modeling_creek_flood_probability') }}%**
+          ({{ states('sensor.ackerly_creek_modeling_creek_model_method') }} model)
 
-          {% set tier = states('sensor.creek_alert_tier') %}
+          {% set tier = states('sensor.ackerly_creek_modeling_creek_alert_tier') %}
           {% if tier == '3' %}🚨 Flooding imminent or underway — act now.
           {% elif tier == '2' %}⚠️ Creek is responding to rain — monitor closely.
           {% elif tier == '1' %}👀 Conditions are setting up — keep an eye on it.
@@ -46,7 +46,7 @@ views:
           _Placeholder thresholds — not yet field-calibrated (open question #7)._
 
       - type: gauge
-        entity: sensor.creek_flood_probability
+        entity: sensor.ackerly_creek_modeling_creek_flood_probability
         name: Flood Probability
         unit: '%'
         min: 0
@@ -60,56 +60,56 @@ views:
         title: Creek Level (24 h)
         hours_to_show: 24
         entities:
-          - entity: sensor.creek_stage
+          - entity: sensor.ackerly_creek_modeling_creek_stage
             name: Stage
 
       - type: entities
         title: Now
         show_header_toggle: false
         entities:
-          - entity: sensor.creek_predicted_crest
+          - entity: sensor.ackerly_creek_modeling_creek_predicted_crest
             name: Predicted crest
-          - entity: sensor.creek_lag_estimate
+          - entity: sensor.ackerly_creek_modeling_creek_lag_estimate
             name: Lag estimate
-          - entity: sensor.creek_soil_moisture_mean
+          - entity: sensor.ackerly_creek_modeling_creek_soil_moisture_mean
             name: Soil moisture (mean)
-          - entity: binary_sensor.creek_soil_ponding
+          - entity: binary_sensor.ackerly_creek_modeling_creek_soil_ponding
             name: Low-lying ponding
 
       - type: entities
         title: Rainfall & forecast
         show_header_toggle: false
         entities:
-          - entity: sensor.creek_rain_1h
+          - entity: sensor.ackerly_creek_modeling_creek_rain_1h
             name: Rain (1 h)
-          - entity: sensor.creek_rain_6h
+          - entity: sensor.ackerly_creek_modeling_creek_rain_6h
             name: Rain (6 h)
-          - entity: sensor.creek_rain_24h
+          - entity: sensor.ackerly_creek_modeling_creek_rain_24h
             name: Rain (24 h)
-          - entity: sensor.creek_rain_72h
+          - entity: sensor.ackerly_creek_modeling_creek_rain_72h
             name: Rain (72 h)
           - type: divider
-          - entity: sensor.creek_qpf_6h
+          - entity: sensor.ackerly_creek_modeling_creek_qpf_6h
             name: Forecast rain (next 6 h)
-          - entity: sensor.creek_qpf_24h
+          - entity: sensor.ackerly_creek_modeling_creek_qpf_24h
             name: Forecast rain (next 24 h)
 
       - type: entities
         title: Upstream & model
         show_header_toggle: false
         entities:
-          - entity: sensor.creek_upstream_rain_1h
+          - entity: sensor.ackerly_creek_modeling_creek_upstream_rain_1h
             name: Upstream rain (1 h)
-          - entity: sensor.creek_upstream_rain_6h
+          - entity: sensor.ackerly_creek_modeling_creek_upstream_rain_6h
             name: Upstream rain (6 h)
-          - entity: sensor.creek_upstream_rain_24h
+          - entity: sensor.ackerly_creek_modeling_creek_upstream_rain_24h
             name: Upstream rain (24 h)
-          - entity: sensor.creek_upstream_precip_today
+          - entity: sensor.ackerly_creek_modeling_creek_upstream_precip_today
             name: Upstream rain (today)
           - type: divider
-          - entity: sensor.creek_nwm_flow
+          - entity: sensor.ackerly_creek_modeling_creek_nwm_flow
             name: NWM forecast flow
-          - entity: sensor.creek_nwm_flow_peak
+          - entity: sensor.ackerly_creek_modeling_creek_nwm_flow_peak
             name: NWM forecast peak
 
   # ============================ OPERATOR ==============================
@@ -121,30 +121,30 @@ views:
       # Banner only while the service is mid-task.
       - type: conditional
         conditions:
-          - entity: sensor.creek_pipeline_state
+          - entity: sensor.ackerly_creek_modeling_creek_pipeline_state
             state: running
         card:
           type: markdown
           content: >
             ⏳ **Pipeline running** — task:
-            {{ state_attr('sensor.creek_pipeline_state', 'task') }}. Buttons are queued
+            {{ state_attr('sensor.ackerly_creek_modeling_creek_pipeline_state', 'task') }}. Buttons are queued
             single-threaded, so a press now runs after the current task.
 
       - type: entities
         title: Controls
         show_header_toggle: false
         entities:
-          - entity: button.creek_run_inference_now
+          - entity: button.ackerly_creek_modeling_creek_run_inference_now
             name: Run inference now
-          - entity: button.creek_retrain_now
+          - entity: button.ackerly_creek_modeling_creek_retrain_now
             name: Retrain now
           - type: divider
-          - entity: button.creek_promote_model
+          - entity: button.ackerly_creek_modeling_creek_promote_model
             name: Promote candidate → active
-          - entity: button.creek_rollback_model
+          - entity: button.ackerly_creek_modeling_creek_rollback_model
             name: Rollback to previous
           - type: divider
-          - entity: sensor.creek_last_command
+          - entity: sensor.ackerly_creek_modeling_creek_last_command
             name: Last command
             secondary_info: last-changed
 
@@ -152,24 +152,24 @@ views:
         title: Pipeline & model status
         show_header_toggle: false
         entities:
-          - entity: sensor.creek_pipeline_state
+          - entity: sensor.ackerly_creek_modeling_creek_pipeline_state
             name: Pipeline state
-          - entity: sensor.creek_last_inference
+          - entity: sensor.ackerly_creek_modeling_creek_last_inference
             name: Last inference
-          - entity: sensor.creek_last_nightly
+          - entity: sensor.ackerly_creek_modeling_creek_last_nightly
             name: Last nightly run
           - type: divider
-          - entity: sensor.creek_model_health
+          - entity: sensor.ackerly_creek_modeling_creek_model_health
             name: Model health
-          - entity: sensor.creek_model_method
+          - entity: sensor.ackerly_creek_modeling_creek_model_method
             name: Active method
-          - entity: sensor.creek_dataset_rows
+          - entity: sensor.ackerly_creek_modeling_creek_dataset_rows
             name: Dataset rows
-          - entity: sensor.creek_event_count
+          - entity: sensor.ackerly_creek_modeling_creek_event_count
             name: Storm events captured
-          - entity: sensor.creek_active_model
+          - entity: sensor.ackerly_creek_modeling_creek_active_model
             name: Active model
-          - entity: sensor.creek_candidate_model
+          - entity: sensor.ackerly_creek_modeling_creek_candidate_model
             name: Candidate model
 
       - type: markdown
@@ -179,9 +179,9 @@ views:
 
           | Metric | Active | Candidate |
           |---|---|---|
-          | Version | {{ states('sensor.creek_active_model') }} | {{ states('sensor.creek_candidate_model') }} |
-          {% set a = state_attr('sensor.creek_active_model', 'active_metrics') or {} %}
-          {% set c = state_attr('sensor.creek_active_model', 'candidate_metrics') or {} %}
+          | Version | {{ states('sensor.ackerly_creek_modeling_creek_active_model') }} | {{ states('sensor.ackerly_creek_modeling_creek_candidate_model') }} |
+          {% set a = state_attr('sensor.ackerly_creek_modeling_creek_active_model', 'active_metrics') or {} %}
+          {% set c = state_attr('sensor.ackerly_creek_modeling_creek_active_model', 'candidate_metrics') or {} %}
           {% set keys = (a.keys() | list + c.keys() | list) | unique | list %}
           {% for k in keys %}| {{ k }} | {{ a.get(k, '—') }} | {{ c.get(k, '—') }} |
           {% endfor %}
@@ -193,7 +193,7 @@ views:
         title: Ingestion health
         show_header_toggle: false
         entities:
-          - entity: sensor.creek_stage
+          - entity: sensor.ackerly_creek_modeling_creek_stage
             name: Creek stage
             secondary_info: last-changed
           - entity: sensor.outside_weather_station_soil_moisture_1
@@ -213,11 +213,11 @@ views:
         title: Watchdogs
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.creek_stage_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_stage_stale
             name: Creek stage stale
-          - entity: binary_sensor.creek_soil_moisture_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_soil_moisture_stale
             name: Soil moisture stale
-          - entity: binary_sensor.creek_rain_rate_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_rain_rate_stale
             name: Rain rate stale
-          - entity: binary_sensor.creek_modeling_service_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_modeling_service_stale
             name: Modeling service stale
