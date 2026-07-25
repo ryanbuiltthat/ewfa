@@ -16,6 +16,7 @@ There is no official USGS gauge on this creek. This project instruments the cree
 ```
 esphome/          ESPHome firmware config for the creek sensor node
 ha-packages/      Home Assistant package YAML (sensors, templates, automations)
+dashboards/       Lovelace dashboards (flood-watch + operator console)
 creek_modeling/   HA add-on: nightly dataset builder + prediction service
 docs/             Project docs, including open questions and decisions log
 repository.yaml   Marks the repo as an installable HA add-on store

@@ -331,3 +331,45 @@ This satisfies §4's "append day's data to dataset (Parquet/SQLite), version mod
 - **Phase 2 (Ingest):** unchanged in scope; the add-on skeleton (`config.yaml`/`Dockerfile`/`run.sh` + a no-op fast loop that just logs) can be stood up here to validate the Supervisor proxy + MQTT wiring before any modeling exists.
 - **Phase 4 (Predict):** the fast-loop inference service and nightly retrain land inside this add-on; `min_events_for_ml` gates the threshold→ML transition (§5) via an option, no rebuild required.
 - **Build/CI:** local-add-on iteration needs no registry; when promoting to a Git add-on repo, reuse the existing ESPHome-fleet GitHub Actions pattern (§8) to lint (`config.yaml`) and build the image per push.
+
+## Addendum B — Flood-watch dashboard + on-demand controls
+
+The headless add-on (no `ingress`/`ports`) is driven and observed entirely over MQTT, so a
+single Lovelace dashboard doubles as an operations console during the data-collection phase.
+Implemented ahead of its Phase-5 slot because watching ingestion and manually kicking the
+pipeline is most useful *now*. Stock cards + the Prism theme; no custom frontend yet (§8).
+
+### B.1 MQTT interface (add-on ⇄ HA)
+
+- **Commands** — HA → add-on, non-retained, `creek/cmd/<name>`:
+  `run_inference`, `retrain`, `promote`, `rollback`. The add-on keys off the trailing topic
+  segment (payload ignored) and executes on its single loop thread — commands are drained
+  between/within the fast-loop sleep, so no two tasks overlap and a press is honored within a
+  few seconds.
+- **Status** — add-on → HA, retained JSON:
+  `creek/status/pipeline` (`state`, `task`, `last_inference_at`, `last_nightly_at`,
+  `last_error`), `creek/status/registry` (active/candidate versions + metrics + history,
+  `event_count`), and `creek/status/command_result` (echo of each command's outcome,
+  non-retained). Existing outputs (`creek/flood_probability`, `predicted_crest`,
+  `lag_estimate`, `model_health`) are unchanged. Timestamps are tz-aware ISO.
+
+### B.2 Model registry (`/data/models/registry.json`)
+
+`{active, candidate, history[], event_count}` with a `metrics` dict per entry. `promote()`
+moves candidate→active (old active pushed to `history`); `rollback()` restores the most
+recent history entry and keeps the demoted model as the new candidate. Pointer/metric logic
+is live now; loading the `.pkl` artifact stays the Phase-4 stub (§5).
+
+### B.3 HA entities & dashboard
+
+`ha-packages/creek_modeling.yaml` defines the MQTT sensors for every output/status topic,
+four MQTT `button` entities for the commands, a placeholder `sensor.creek_alert_tier` (§6),
+and sensor-fault "stale" watchdogs (§4). `dashboards/creek_flood_watch.yaml` presents two
+views: a glanceable **household** view (tier + probability gauge + creek trend + plain-language
+status) and an **operator** view (controls, pipeline/model status, ingestion-health with
+staleness, and a candidate-vs-active model review).
+
+### B.4 Later (optional)
+
+An `ingress` log-viewer panel could be added in Phase 5 for raw log tailing; the MQTT
+command/status path above stays the primary interface.
