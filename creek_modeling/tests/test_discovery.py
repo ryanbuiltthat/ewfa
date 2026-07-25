@@ -20,7 +20,7 @@ def test_topics_and_counts():
     # 14 sensors + 4 buttons
     sensors = [t for t, _ in pairs if "/sensor/" in t]
     buttons = [t for t, _ in pairs if "/button/" in t]
-    assert len(sensors) == 14, len(sensors)
+    assert len(sensors) == 21, len(sensors)   # 14 status/model + 7 rain/QPF
     assert len(buttons) == 4, len(buttons)
     for topic, _ in pairs:
         assert topic.startswith("homeassistant/")
@@ -59,10 +59,19 @@ def test_base_topic_is_honored():
     assert cfgs["creek_flood_probability"]["state_topic"] == "flood/flood_probability"
 
 
+def test_rain_and_qpf_sensors_present():
+    pub, _ = build()
+    cfgs = {c["object_id"]: c for _, c in pub.configs()}
+    for w in (1, 3, 6, 24, 72):
+        assert cfgs[f"creek_rain_{w}h"]["state_topic"] == "creek/features"
+    assert cfgs["creek_qpf_6h"]["device_class"] == "precipitation"
+    assert cfgs["creek_qpf_24h"]["unit_of_measurement"] == "in"
+
+
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 18
+    assert len(published) == 25
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON

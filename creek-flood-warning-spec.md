@@ -387,3 +387,40 @@ staleness, and a candidate-vs-active model review).
 
 An `ingress` log-viewer panel could be added in Phase 5 for raw log tailing; the MQTT
 command/status path above stays the primary interface.
+
+## Addendum C — Forecast/upstream ingestion (in the add-on)
+
+Resolves how the §5 features beyond stage/soil are collected. Decision: the add-on fetches
+them directly (Python) and publishes each as an MQTT-discovery sensor, rather than HA `rest:`
+sensors — consistent with Addendum B (versioned, unit-testable with mocked HTTP,
+auto-provisioned, secrets stay in add-on options). These are independent of the creek gauge,
+so they proceed while the water-level sensor is pending and enable forecast-based Tiers 0/1.
+
+### C.1 Architecture
+
+`app/sources/` — one module per source, each returning `{feature: float|None}`; a coordinator
+merges them into the feature row and respects a per-source refresh interval with last-good
+caching (a source that errors returns its cached value / `None`, never crashing the loop).
+All rainfall features are normalized to **inches**. The merged features are published on
+`creek/features` (one retained JSON) and written into the widened `FeatureRow`/dataset; each
+is an MQTT-discovery sensor under the *Ackerly Creek Modeling* device. Location (lat/lon) is
+read once from HA `/api/config` — no new option.
+
+### C.2 Sources (delivered in two slices)
+
+- **2a — on-site rain + NWS QPF:**
+  - `rain.py` — rolling accumulator: samples `onsite_rain_rate_entity` each fast loop,
+    integrates rate×Δt into a 72 h ring persisted under `/data/state/`, and reports
+    `rain_{1,3,6,24,72}h_in`. Builds up over the first 72 h from a cold start.
+  - `nws.py` — `api.weather.gov` `points/{lat},{lon}` → `forecastGridData` →
+    `quantitativePrecipitation` (mm, ISO-interval values); pro-rated into `qpf_6h_in` /
+    `qpf_24h_in`. No key; requires a `User-Agent`. Refresh ~15 min.
+- **2b — upstream + model (later):** `wu.py` (Weather Underground PWS upstream accumulations,
+  `wu_api_key` + `upstream_pws_ids`) and `nwm.py` (NWPS reach streamflow forecast,
+  `nwm_reach_id`).
+
+### C.3 Consumption
+
+2a records + publishes the features (dataset growth + dashboard visibility). Wiring them into
+the tier logic (a real Tier 0 Advisory from QPF + soil, Tier 1 Watch from upstream rain) and
+into the model is a subsequent step, behind the same interfaces.

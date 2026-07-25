@@ -121,6 +121,28 @@ class DiscoveryPublisher:
                 "state_topic": f"{b}/status/registry",
                 "value_template": "{{ value_json.candidate_version if value_json.candidate_version is not none else 'none' }}",
                 "icon": "mdi:cube-scan"}),
+            # --- ingested features (Addendum C 2a): rain accumulations + NWS QPF ---
+            *(
+                ("sensor", f"creek_rain_{w}h", {
+                    "name": f"Creek Rain {w}h",
+                    "state_topic": f"{b}/features",
+                    "value_template": f"{{{{ value_json.rain_{w}h_in if value_json.rain_{w}h_in is not none else none }}}}",
+                    "unit_of_measurement": "in", "device_class": "precipitation",
+                    "state_class": "measurement", "icon": "mdi:weather-pouring"})
+                for w in (1, 3, 6, 24, 72)
+            ),
+            ("sensor", "creek_qpf_6h", {
+                "name": "Creek QPF 6h",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.qpf_6h_in if value_json.qpf_6h_in is not none else none }}",
+                "unit_of_measurement": "in", "device_class": "precipitation",
+                "state_class": "measurement", "icon": "mdi:weather-rainy"}),
+            ("sensor", "creek_qpf_24h", {
+                "name": "Creek QPF 24h",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.qpf_24h_in if value_json.qpf_24h_in is not none else none }}",
+                "unit_of_measurement": "in", "device_class": "precipitation",
+                "state_class": "measurement", "icon": "mdi:weather-rainy"}),
             # --- command buttons ---
             ("button", "creek_run_inference_now", {
                 "name": "Creek Run Inference Now",

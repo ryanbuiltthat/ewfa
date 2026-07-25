@@ -27,6 +27,7 @@ from .ha import HAClient
 from .model import Model
 from .mqtt_client import MqttClient
 from .registry import ModelRegistry
+from .sources import FEATURE_KEYS, SourceCoordinator
 from .tiers import compute_tier
 
 log = logging.getLogger("app")
@@ -67,6 +68,7 @@ def _run_inference_once(
     mqtt.publish("lag_estimate", {"value": pred.lag_estimate_min})
     tier, label = compute_tier(pred.flood_probability, row.ponding_flag)
     mqtt.publish("alert_tier", {"value": tier, "label": label})
+    mqtt.publish("features", {k: getattr(row, k) for k in FEATURE_KEYS})
     dataset.append_row(row)
     status["last_inference_at"] = _now_iso()
     return f"p={pred.flood_probability} tier={tier} method={pred.method}"
@@ -138,7 +140,8 @@ def main() -> int:
     mqtt.add_on_ready(discovery.publish_all)
     mqtt.connect()
 
-    features = FeatureBuilder(cfg, ha)
+    sources = SourceCoordinator(cfg, ha, data_dir)
+    features = FeatureBuilder(cfg, ha, sources)
     model = Model(cfg, registry)
     dataset = DatasetWriter(data_dir)
 

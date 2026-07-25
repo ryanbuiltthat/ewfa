@@ -76,6 +76,24 @@ views:
           - entity: binary_sensor.creek_soil_ponding
             name: Low-lying ponding
 
+      - type: entities
+        title: Rainfall & forecast
+        show_header_toggle: false
+        entities:
+          - entity: sensor.creek_rain_1h
+            name: Rain (1 h)
+          - entity: sensor.creek_rain_6h
+            name: Rain (6 h)
+          - entity: sensor.creek_rain_24h
+            name: Rain (24 h)
+          - entity: sensor.creek_rain_72h
+            name: Rain (72 h)
+          - type: divider
+          - entity: sensor.creek_qpf_6h
+            name: Forecast rain (next 6 h)
+          - entity: sensor.creek_qpf_24h
+            name: Forecast rain (next 24 h)
+
   # ============================ OPERATOR ==============================
   - title: Operator
     path: operator

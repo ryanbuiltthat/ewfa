@@ -26,6 +26,14 @@ class FeatureRow:
     soil_moisture_near_house_pct: float | None   # WH51 #1, willow tree
     soil_moisture_near_creek_pct: float | None   # WH51 #2, closest to creek
     ponding_flag: bool              # low-lying sensors saturated -> fast runoff
+    # --- forecast/upstream features (Addendum C, filled by SourceCoordinator) ---
+    rain_1h_in: float | None = None
+    rain_3h_in: float | None = None
+    rain_6h_in: float | None = None
+    rain_24h_in: float | None = None
+    rain_72h_in: float | None = None
+    qpf_6h_in: float | None = None
+    qpf_24h_in: float | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -37,9 +45,10 @@ PONDING_SATURATION_PCT = 85.0
 
 
 class FeatureBuilder:
-    def __init__(self, cfg: Config, ha: HAClient):
+    def __init__(self, cfg: Config, ha: HAClient, sources=None):
         self._cfg = cfg
         self._ha = ha
+        self._sources = sources   # SourceCoordinator | None (Addendum C)
         self._last_stage: tuple[float, float] | None = None  # (ts, stage_ft)
 
     def _rate_of_rise(self, ts: float, stage_ft: float | None) -> float | None:
@@ -76,5 +85,8 @@ class FeatureBuilder:
             soil_moisture_near_creek_pct=near_creek,
             ponding_flag=ponding,
         )
+        if self._sources is not None:
+            for key, value in self._sources.features().items():
+                setattr(row, key, value)
         log.debug("Built feature row: %s", row)
         return row

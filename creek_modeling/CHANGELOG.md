@@ -3,6 +3,19 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.4.0
+
+- **Forecast/upstream ingestion — slice 2a** (spec Addendum C): the add-on now fetches its
+  own features and publishes them on `creek/features`, auto-created as discovery sensors:
+  - **On-site rain accumulations** `rain_{1,3,6,24,72}h` — a rolling accumulator integrates
+    the Ecowitt rain rate (in or mm) into a 72 h ring persisted under `/data/state/`.
+  - **NWS QPF** `qpf_6h` / `qpf_24h` — free NOAA gridpoint forecast (no key), pro-rated from
+    the mm interval values to inches. Location read from HA config; refresh ~15 min.
+- Sources run through a coordinator with per-source refresh + last-good caching, so a flaky
+  API never stalls or crashes the fast loop. Feature rows (and the dataset) widen accordingly.
+- Adds tests for the accumulator, QPF parsing/proration, and the coordinator. Bump 0.4.0.
+- (Slice 2b — Weather Underground upstream + NWM reach — to follow.)
+
 ## 0.3.0
 
 - **MQTT Discovery:** the add-on now auto-provisions its HA entities (all `creek_*` sensors
