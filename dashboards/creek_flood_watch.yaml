@@ -281,16 +281,16 @@ views:
           - entity: sensor.creek_stage
             name: Creek stage
             secondary_info: last-changed
-          - entity: sensor.outside_weather_station_soil_moisture_1
+          - entity: sensor.outside_weather_station_soil_moisture_field
             name: Soil — near house
             secondary_info: last-changed
-          - entity: sensor.outside_weather_station_soil_moisture_2
+          - entity: sensor.outside_weather_station_soil_moisture_willow
             name: Soil — near creek
             secondary_info: last-changed
-          - entity: sensor.weather_station_rain_rate
+          - entity: sensor.outside_weather_station_rain_intensity
             name: Rain rate
             secondary_info: last-changed
-          - entity: sensor.weather_station_daily_rain
+          - entity: sensor.outside_weather_station_rain_daily
             name: Rain today
             secondary_info: last-changed
 
