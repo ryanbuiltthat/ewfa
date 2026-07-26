@@ -24,3 +24,10 @@ resolution as each is answered.
 8. Tier thresholds in `creek_modeling/app/tiers.py` are placeholders. The forecast/rainfall
    ones (Advisory, Watch) can be tuned from the first few storms without the creek gauge;
    the stage-based ones (Warning, Emergency) depend on #5.
+
+9. The API recession constant `k` (`app/sources/apindex.py`, currently 0.92 ≈ a two-week
+   memory) is a literature default, not a fitted value. Fit it once a few storms are
+   recorded — the right `k` is the one whose index best separates storms that produced a
+   creek response from those that did not.
+10. Rain-on-snow thresholds (`app/features.py`: 0.20 in SWE, 34 °F) are placeholders, and
+   the flag cannot be validated until a winter rain-on-snow event is actually captured.

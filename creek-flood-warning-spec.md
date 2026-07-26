@@ -448,9 +448,19 @@ read once from HA `/api/config` — no new option.
   **observed** rainfall→response record available before the creek node exists, which lets the
   Phase-3 lag/response work start against real hydrographs instead of waiting on hardware.
 
-Still to build for Phase 2: Google Flood Forecasting (`gauges:searchGaugesByArea`, §3),
-SNODAS snow-water-equivalent (rain-on-snow, §1), NWS active alert products (the Flood Warning
-force-promote in §6), and the Antecedent Precipitation Index (§5).
+- **2d — NWS alert products (done):** `alerts.py` (active Flood Watch / Flood Warning /
+  Flash Flood Warning covering the site, by point rather than county zone). These impose a
+  *floor* on the alert tier per §6 — a forecaster issuing a product knows things our
+  instruments do not, which matters most while the creek gauge is missing.
+- **2e — SNODAS snowpack (done):** `snodas.py` (snow water equivalent for the site's grid
+  cell, read straight from the gridded masked product since NOHRSC exposes no point API).
+  Combined with temperature into the rain-on-snow flag §1 calls out as a major NEPA driver.
+- **2f — Antecedent Precipitation Index (done):** `apindex.py`, an exponentially-decaying
+  rainfall memory riding on the on-site rain samples. Complements the two WH51 probes with a
+  basin-wide view of how wet the ground already is.
+
+Still to build for Phase 2: **Google Flood Forecasting** (`gauges:searchGaugesByArea`, §3)
+— deferred pending API access, and open question #2 stays open with it.
 
 ### C.3 Consumption
 
