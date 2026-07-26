@@ -19,17 +19,29 @@
 template:
   - binary_sensor:
       # The one watchdog that cannot move into the add-on: a service cannot report its own
-      # death. The add-on publishes pipeline status every fast loop (default 5 min),
-      # toggling idle/running, so last_changed tracks liveness. No update in 15 min means
-      # it is stopped or wedged. (Its MQTT LWT also flips every discovered entity to
-      # unavailable when it disconnects, which covers the common case on its own.)
+      # death. No inference in 15 minutes (the fast loop is 5) means it is stopped or
+      # wedged. Its MQTT LWT also flips every discovered entity to unavailable when it
+      # disconnects cleanly, which covers the common case on its own — this catches the
+      # case where the process is alive but the loop has stopped turning.
+      #
+      # This compares the *value* of the last-inference timestamp rather than the
+      # last_changed of the pipeline-state entity. The earlier version did the latter, and
+      # it was fragile in both directions: pipeline_state only toggles idle/running for a
+      # moment each loop, so if Home Assistant ever missed the brief `running` transition
+      # its last_changed froze and the watchdog stuck at Problem forever. The timestamp
+      # advances every loop by construction, whether or not any state string changes.
       - name: "Creek Modeling Service Stale"
         unique_id: creek_modeling_service_stale
         device_class: problem
         state: >
-          {% set e = states.sensor.ackerly_creek_modeling_creek_pipeline_state %}
-          {{ e is none or e.state in ['unknown', 'unavailable']
-             or (now() - e.last_changed).total_seconds() > 900 }}
+          {% set e = 'sensor.ackerly_creek_modeling_creek_last_inference' %}
+          {{ not has_value(e)
+             or (now() - as_datetime(states(e))).total_seconds() > 900 }}
+        attributes:
+          # Surfaced so a Problem can be told apart at a glance: entity missing (a stale
+          # copy of this package, or the add-on never started) vs. loop genuinely stalled.
+          last_inference: >
+            {{ states('sensor.ackerly_creek_modeling_creek_last_inference') }}
 
 automation:
   # Tier evaluation lives in the add-on (app/tiers.py) and arrives as

@@ -3,6 +3,20 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.1
+
+- **Fix the `Creek Modeling Service Stale` watchdog** (`ha-packages/creek_warning.yaml`).
+  It inferred liveness from `last_changed` on the pipeline-state entity, which only toggles
+  idle/running for a moment each loop — if Home Assistant ever missed that brief transition,
+  last_changed froze and the watchdog stuck at Problem indefinitely. It now compares the
+  *value* of `creek_last_inference`, which advances every fast loop by construction. Adds a
+  `last_inference` attribute so a Problem can be told apart at a glance: entity missing
+  versus loop genuinely stalled.
+  - This watchdog is the one thing left in the HA package, so it does **not** arrive with an
+    add-on update — re-copy `ha-packages/creek_warning.yaml` into your HA config directory.
+  - A copy of that file predating 0.6.0 referenced the unprefixed
+    `sensor.creek_pipeline_state`, which never existed, so it reported Problem permanently.
+
 ## 0.11.0 — Phase 3 (Collect & correlate)
 
 - **Storm event log** (`app/storms.py`, spec §7): detects storms from the live feature
