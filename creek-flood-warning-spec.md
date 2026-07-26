@@ -468,6 +468,15 @@ read once from HA `/api/config` — no new option.
   - `nws.py` — `api.weather.gov` `points/{lat},{lon}` → `forecastGridData` →
     `quantitativePrecipitation` (mm, ISO-interval values); pro-rated into `qpf_6h_in` /
     `qpf_24h_in`. No key; requires a `User-Agent`. Refresh ~15 min.
+    Proration runs over each interval's *remaining* time, so the interval already in
+    progress contributes its full forecast rather than a share scaled by how much of it
+    has elapsed. BGM issues this grid in 6-hour blocks, which makes that interval most of
+    a 6 h forecast; prorating it over its full span assumes the un-elapsed remainder has
+    already fallen, and decays the number toward zero as a forecast storm approaches.
+    Rain that really has fallen is not lost — the on-site gauge measures it as `rain_*_in`.
+    **Note the standing limitation:** gridded QPF cannot resolve convection at all. A
+    pop-up thunderstorm reads near zero here no matter how it is prorated, so QPF is a
+    frontal-rain signal and the on-site rain rate is the only nowcast.
 - **2b — upstream + model (done):** `wu.py` (Weather Underground PWS upstream accumulations
   via the shared accumulator, `wu_api_key` + `upstream_pws_ids`) and `nwm.py` (NWPS reach
   short-range streamflow forecast — near-term + peak discharge, `nwm_reach_id`).

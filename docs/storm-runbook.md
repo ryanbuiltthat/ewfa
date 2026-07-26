@@ -19,6 +19,12 @@ What to do when a storm hits. Checklist form — meant to be readable on a phone
       on, fix it now — a storm recorded with dark sources is a wasted storm, and the ML
       gate wants 10 of them.
 - [ ] Don't act on the tier itself. Treat it as *go look*, not an alarm.
+- [ ] **Ignore QPF for thunderstorms.** Gridded forecast, 6-hour blocks — it cannot resolve
+      convection and will read near zero during a pop-up storm. That is expected, not a
+      fault. Watch **rain rate / rain 1h** (on-site, every 5 min) instead; that is the only
+      nowcast. QPF is for frontal rain.
+- [ ] If it's raining and **rain rate is also flat**, that's a real fault — Ecowitt
+      ingestion, not NWS. Check the Ingestion health card.
 
 ## During — you are the gauge
 

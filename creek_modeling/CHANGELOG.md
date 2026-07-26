@@ -3,6 +3,30 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.5
+
+- **QPF no longer decays as a forecast storm approaches.** Proration now runs over each
+  interval's *remaining* time, so the interval already in progress contributes its full
+  forecast instead of a share scaled by how much of it has elapsed.
+
+  Prorating over the full span quietly assumed the un-elapsed remainder had already
+  fallen. BGM issues this grid in **6-hour blocks**, so that assumption governed most of
+  a 6 h forecast: a forecaster's 0.15" placed in the 18:00–00:00Z block for an evening
+  thunderstorm shrank steadily through the afternoon and bottomed out just as the storm
+  arrived — the wrong direction of error for a flashy basin (spec §1). Rain that really
+  had fallen was never lost; the on-site gauge measures it and it reaches the tiers as
+  `rain_*_in`.
+
+  Measured against the live BGM 76,32 grid: `qpf_6h_in` 0.041 → 0.158, `qpf_24h_in`
+  0.059 → 0.176. Trailing-edge clipping is unchanged — an interval running past the
+  window is still cut at the window, or a 6 h figure would count rain forecast outside
+  the next 6 hours.
+
+- **Standing limitation, unchanged by the above:** gridded QPF cannot resolve convection.
+  A pop-up thunderstorm reads near zero regardless of proration, so `qpf_*` is a
+  frontal-rain signal. The on-site rain rate (sampled every fast loop) is the only
+  nowcast, and NWS alerts (5 min) are the only forecaster-in-the-loop signal.
+
 ## 0.11.4
 
 - **Storm annotation actually works now.** Two separate defects made the documented
