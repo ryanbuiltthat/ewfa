@@ -56,6 +56,10 @@ class FeatureRow:
     nws_flood_warning: float | None = None
     nws_flash_flood_warning: float | None = None
     nws_alert_count: float | None = None
+    # SNODAS snowpack + the rain-on-snow condition it enables (spec §1/§5).
+    snow_water_equivalent_in: float | None = None
+    temp_f: float | None = None
+    rain_on_snow_flag: bool = False
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -65,6 +69,21 @@ class FeatureRow:
 # and "pond", shortening the rainfall->runoff response. Tune with observed storms.
 PONDING_SATURATION_PCT = 85.0
 
+# Rain-on-snow (spec §1: a major NEPA flood driver). Rain falling on an existing snowpack
+# at above-freezing temperatures both adds its own water and melts the pack, so runoff far
+# exceeds what the rainfall alone suggests. PLACEHOLDER thresholds.
+ROS_MIN_SWE_IN = 0.20        # below this the pack holds too little water to matter
+ROS_MIN_TEMP_F = 34.0        # melting, and precip is falling as rain rather than snow
+ROS_MIN_RAIN_1H_IN = 0.02    # rain actually falling now
+ROS_MIN_QPF_6H_IN = 0.10     # ...or forecast within the warning window
+
+
+def _to_fahrenheit(value: float | None, unit: str | None) -> float | None:
+    """Normalize a temperature reading to °F; HA may report either scale."""
+    if value is None:
+        return None
+    return value * 9.0 / 5.0 + 32.0 if unit and "C" in unit.upper() else value
+
 
 class FeatureBuilder:
     def __init__(self, cfg: Config, ha: HAClient, sources=None):
@@ -72,6 +91,7 @@ class FeatureBuilder:
         self._ha = ha
         self._sources = sources   # SourceCoordinator | None (Addendum C)
         self._last_stage: tuple[float, float] | None = None  # (ts, stage_ft)
+        self._temp_unit: str | None = None                   # cached on first read
 
     def _rate_of_rise(self, ts: float, stage_ft: float | None) -> float | None:
         """Inches per minute since the previous sample; None on first/invalid."""
@@ -110,5 +130,29 @@ class FeatureBuilder:
         if self._sources is not None:
             for key, value in self._sources.features().items():
                 setattr(row, key, value)
+
+        # Cross-source, so it is derived here rather than inside any single source.
+        row.temp_f = self._temp_f()
+        row.rain_on_snow_flag = self._rain_on_snow(row)
+
         log.debug("Built feature row: %s", row)
         return row
+
+    def _temp_f(self) -> float | None:
+        entity = self._cfg.onsite_temp_entity
+        if not entity:
+            return None
+        if self._temp_unit is None:
+            self._temp_unit = self._ha.get_unit(entity) or ""
+        return _to_fahrenheit(self._ha.get_float(entity), self._temp_unit)
+
+    @staticmethod
+    def _rain_on_snow(row: FeatureRow) -> bool:
+        """Rain falling on a melting snowpack — every input must be present to fire."""
+        if row.snow_water_equivalent_in is None or row.temp_f is None:
+            return False
+        if row.snow_water_equivalent_in < ROS_MIN_SWE_IN or row.temp_f < ROS_MIN_TEMP_F:
+            return False
+        raining = (row.rain_1h_in or 0.0) >= ROS_MIN_RAIN_1H_IN
+        forecast = (row.qpf_6h_in or 0.0) >= ROS_MIN_QPF_6H_IN
+        return raining or forecast

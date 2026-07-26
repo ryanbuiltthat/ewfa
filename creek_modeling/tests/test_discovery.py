@@ -20,9 +20,10 @@ def test_topics_and_counts():
     sensors = [t for t, _ in pairs if "/sensor/" in t]
     binaries = [t for t, _ in pairs if "/binary_sensor/" in t]
     buttons = [t for t, _ in pairs if "/button/" in t]
-    # 15 status/model + 7 (2a) + 8 (2b) + 6 (2c) + 1 (2d alert count)
-    assert len(sensors) == 37, len(sensors)
-    assert len(binaries) == 3, len(binaries)   # 2d NWS watch/warning/flash flags
+    # 15 status/model + 7 (2a) + 8 (2b) + 6 (2c) + 1 (2d) + 2 (2e swe/temp)
+    assert len(sensors) == 39, len(sensors)
+    # 2d NWS watch/warning/flash flags + 2e rain-on-snow
+    assert len(binaries) == 4, len(binaries)
     assert len(buttons) == 4, len(buttons)
     for topic, _ in pairs:
         assert topic.startswith("homeassistant/")
@@ -73,7 +74,7 @@ def test_rain_and_qpf_sensors_present():
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 44
+    assert len(published) == 47
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON

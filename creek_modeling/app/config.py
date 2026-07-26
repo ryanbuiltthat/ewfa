@@ -56,6 +56,8 @@ class Config:
     onsite_rain_daily_entity: str | None = None
     upstream_pws_ids: list[str] = field(default_factory=list)
     usgs_downstream: bool = True
+    snodas_swe: bool = True
+    onsite_temp_entity: str | None = None
 
     # MQTT (from service discovery via run.sh)
     mqtt_host: str = "core-mosquitto"
@@ -87,6 +89,8 @@ class Config:
             onsite_rain_daily_entity=opts.get("onsite_rain_daily_entity") or None,
             upstream_pws_ids=list(opts.get("upstream_pws_ids", [])),
             usgs_downstream=bool(opts.get("usgs_downstream", True)),
+            snodas_swe=bool(opts.get("snodas_swe", True)),
+            onsite_temp_entity=opts.get("onsite_temp_entity") or None,
             mqtt_host=env.get("MQTT_HOST", "core-mosquitto"),
             mqtt_port=int(env.get("MQTT_PORT", 1883)),
             mqtt_user=env.get("MQTT_USER", ""),

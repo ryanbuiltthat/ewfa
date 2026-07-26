@@ -233,6 +233,25 @@ class DiscoveryPublisher:
                 "state_topic": f"{b}/features",
                 "value_template": "{{ value_json.nws_alert_count if value_json.nws_alert_count is not none else none }}",
                 "state_class": "measurement", "icon": "mdi:bell-alert-outline"}),
+            # --- ingested features (Addendum C 2e): snowpack + rain-on-snow ---
+            ("sensor", "creek_snow_water_equivalent", {
+                "name": "Creek Snow Water Equivalent",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.snow_water_equivalent_in if value_json.snow_water_equivalent_in is not none else none }}",
+                "unit_of_measurement": "in", "device_class": "precipitation",
+                "state_class": "measurement", "icon": "mdi:snowflake"}),
+            ("sensor", "creek_temperature", {
+                "name": "Creek Temperature",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.temp_f if value_json.temp_f is not none else none }}",
+                "unit_of_measurement": "°F", "device_class": "temperature",
+                "state_class": "measurement", "icon": "mdi:thermometer"}),
+            ("binary_sensor", "creek_rain_on_snow", {
+                "name": "Creek Rain On Snow",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ 'ON' if value_json.rain_on_snow_flag else 'OFF' }}",
+                "payload_on": "ON", "payload_off": "OFF",
+                "device_class": "safety", "icon": "mdi:weather-snowy-rainy"}),
             # --- command buttons ---
             ("button", "creek_run_inference_now", {
                 "name": "Creek Run Inference Now",

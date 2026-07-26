@@ -74,6 +74,8 @@ Set these on the **Configuration** tab.
 | `onsite_rain_rate_entity` | `sensor.weather_station_rain_rate` | Ecowitt |
 | `onsite_rain_daily_entity` | `sensor.weather_station_daily_rain` | Ecowitt |
 | `usgs_downstream` | `true` | Poll USGS 01534860 / 01534000 (free, no key) for lag validation |
+| `snodas_swe` | `true` | Daily SNODAS snow-water-equivalent for the site cell (free, no key) |
+| `onsite_temp_entity` | `sensor.weather_station_outdoor_temperature` | Ecowitt; needed for the rain-on-snow flag |
 
 ## How it talks to Home Assistant
 
@@ -121,10 +123,10 @@ question #5), WH51 calibration (#7), and observed storms (Phase 3).
 
 ## Status
 
-Phase 2 (Ingest). Live: on-site rain accumulations, NWS QPF, Weather Underground upstream
-PWS, NWM reach forecast, USGS downstream gauges, and forecast-driven alert tiers. Still
-outstanding for Phase 2: Google Flood Forecasting, SNODAS snow-water-equivalent, NWS active
-alert products, and the Antecedent Precipitation Index. Gradient-boosting inference and
+Phase 2 (Ingest). Live: on-site rain accumulations, NWS QPF, NWS active alert products,
+Weather Underground upstream PWS, NWM reach forecast, USGS gauges, SNODAS snowpack with a
+rain-on-snow flag, and forecast-driven alert tiers. Still outstanding for Phase 2: Google
+Flood Forecasting and the Antecedent Precipitation Index. Gradient-boosting inference and
 nightly retrain land in Phase 4 behind the same interfaces (`app/model.py`).
 
 > **Calibration note:** WH51 soil-moisture readings are relative (0–100 %) and site-specific.

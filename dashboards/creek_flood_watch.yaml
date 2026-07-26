@@ -103,6 +103,19 @@ views:
           - entity: sensor.ackerly_creek_modeling_creek_qpf_24h
             name: Forecast rain (next 24 h)
 
+      # Snowpack. Rain-on-snow is a major NEPA flood driver (spec §1) — the pack melts
+      # into the same storm, so runoff exceeds what the rainfall alone suggests.
+      - type: entities
+        title: Snowpack
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.ackerly_creek_modeling_creek_rain_on_snow
+            name: Rain on snow
+          - entity: sensor.ackerly_creek_modeling_creek_snow_water_equivalent
+            name: Snow water equivalent
+          - entity: sensor.ackerly_creek_modeling_creek_temperature
+            name: Temperature
+
       # Active NWS products covering the site. Any of these floors the alert tier (§6).
       - type: entities
         title: NWS alerts

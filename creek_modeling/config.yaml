@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.7.0"
+version: "0.8.0"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa
@@ -51,6 +51,10 @@ options:
   # Nearest USGS gauges (01534860 Lackawanna/Leggetts, 01534000 Tunkhannock) — free, no key.
   # Validation/lag reference only; not a stand-in for creek level.
   usgs_downstream: true
+  # SNODAS snow water equivalent for the site's grid cell — free, no key. Feeds the
+  # rain-on-snow flag (spec §1); pair it with onsite_temp_entity for that to fire.
+  snodas_swe: true
+  onsite_temp_entity: sensor.weather_station_outdoor_temperature
 
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)
@@ -70,3 +74,5 @@ schema:
   onsite_rain_rate_entity: str?
   onsite_rain_daily_entity: str?
   usgs_downstream: bool
+  snodas_swe: bool
+  onsite_temp_entity: str?

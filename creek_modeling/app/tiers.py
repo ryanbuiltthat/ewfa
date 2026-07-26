@@ -46,6 +46,9 @@ ADVISORY_QPF_24H_IN = 1.0
 ADVISORY_SOIL_PCT = 70.0
 ADVISORY_QPF_6H_IN = 0.75          # heavy short-fuse rain earns an advisory on its own
 
+# --- Rain-on-snow: rain actually falling (rather than forecast) onto a pack ---
+ROS_WATCH_RAIN_1H_IN = 0.05
+
 # --- Tier 2 Watch: rain materializing upstream, creek not yet responding ---
 WATCH_UPSTREAM_3H_IN = 0.75
 WATCH_UPSTREAM_6H_IN = 1.00
@@ -91,6 +94,16 @@ def compute_tier(row: FeatureRow, flood_probability: float | None) -> tuple[int,
         reasons.append((1, f"{row.qpf_6h_in:.2f}\" forecast in the next 6 h"))
     if row.ponding_flag:
         reasons.append((1, "low-lying ground already ponding"))
+
+    # --- Rain-on-snow (spec §1: a major NEPA flood driver) ---
+    # The pack contributes meltwater on top of the rain, so the same QPF produces more
+    # runoff. Escalates a step: advisory on its own, watch once the rain is falling.
+    if row.rain_on_snow_flag:
+        swe = row.snow_water_equivalent_in or 0.0
+        if _ge(row.rain_1h_in, ROS_WATCH_RAIN_1H_IN):
+            reasons.append((2, f"rain on {swe:.2f}\" snowpack — melt adds to runoff"))
+        else:
+            reasons.append((1, f"rain forecast onto {swe:.2f}\" snowpack"))
 
     # --- Tier 2 Watch (rain on the ground upstream; still no gauge needed) ---
     if _ge(row.upstream_rain_3h_in, WATCH_UPSTREAM_3H_IN):

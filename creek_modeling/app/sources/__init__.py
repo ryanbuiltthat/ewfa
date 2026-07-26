@@ -20,6 +20,7 @@ from .alerts import NwsAlerts
 from .nwm import NwmReach
 from .nws import NwsQpf
 from .rain import RainAccumulator
+from .snodas import SnodasSwe
 from .usgs import SITES as USGS_SITES, UsgsDownstream, feature_keys as usgs_feature_keys
 from .wu import WuUpstream
 
@@ -38,6 +39,8 @@ FEATURE_KEYS = (
     *usgs_feature_keys(),
     # 2d — NWS active alert products
     "nws_flood_watch", "nws_flood_warning", "nws_flash_flood_warning", "nws_alert_count",
+    # 2e — SNODAS snowpack
+    "snow_water_equivalent_in",
 )
 
 
@@ -54,8 +57,11 @@ class SourceCoordinator:
             self._sources.append(NwsQpf(*latlon))
             self._sources.append(NwsAlerts(*latlon))
             log.info("NWS QPF + alerts enabled for lat/lon %.4f,%.4f", *latlon)
+            if cfg.snodas_swe:
+                self._sources.append(SnodasSwe(*latlon, data_dir))
+                log.info("SNODAS SWE enabled")
         else:
-            log.warning("No lat/lon from HA config — NWS QPF and alerts disabled")
+            log.warning("No lat/lon from HA config — NWS QPF, alerts and SNODAS disabled")
 
         if cfg.wu_api_key and cfg.upstream_pws_ids:
             self._sources.append(WuUpstream(cfg.wu_api_key, cfg.upstream_pws_ids, data_dir))

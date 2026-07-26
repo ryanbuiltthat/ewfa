@@ -3,6 +3,25 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.8.0
+
+- **SNODAS snowpack — ingestion slice 2e** (spec §1/§5): `app/sources/snodas.py` reports
+  `snow_water_equivalent_in` for the site's grid cell. NOHRSC publishes no point API (the
+  "nearest" page returns HTML whatever `fmt` you ask for), so this reads the gridded masked
+  product directly: pull the daily tar, stream the SWE member's gzip to the one cell we
+  need, and discard the rest rather than decompressing a 46 MB raster. Grid geometry was
+  verified against a real February file — the site cell read 42 mm, ocean and Florida cells
+  read no-data, and a Cascades cell saturated. Daily product, so results are cached per date
+  under `/data/state/` and the fetch walks back up to 5 days for late or skipped postings.
+- **Rain-on-snow flag** — derived in `features.py` because it spans sources: a meaningful
+  pack, above-freezing temperature, and rain either falling or forecast. Needs the new
+  `onsite_temp_entity` option (readings are normalised to °F either way). Every input must
+  be present, so a missing source can never fabricate the condition.
+- **Tier rule for rain-on-snow**: Advisory when it is forecast, Watch once the rain is
+  actually falling. The pack melts into the same storm, so the same QPF yields more runoff.
+- Adds a `Creek Snowpack Data Missing` watchdog. Off-season a bare cell reads 0.00 in rather
+  than null, so this flags a genuinely failing fetch, not the absence of snow.
+
 ## 0.7.0
 
 - **NWS active alert products — ingestion slice 2d** (spec §3): `app/sources/alerts.py`
