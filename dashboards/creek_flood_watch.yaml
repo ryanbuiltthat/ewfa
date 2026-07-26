@@ -299,3 +299,7 @@ views:
             name: NWM reach missing
           - entity: binary_sensor.creek_downstream_gauge_missing
             name: USGS gauges missing
+          - entity: binary_sensor.creek_snowpack_data_missing
+            name: SNODAS snowpack missing
+          - entity: binary_sensor.creek_nws_alerts_missing
+            name: NWS alert feed missing
