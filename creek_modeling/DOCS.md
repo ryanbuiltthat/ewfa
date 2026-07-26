@@ -67,8 +67,8 @@ Set these on the **Configuration** tab.
 | `min_events_for_ml` | `10` | Stay on the threshold model until ≥ N storms captured |
 | `google_floods_api_key` | `""` | Optional (Google Flood status) |
 | `wu_api_key` | `""` | Optional (Weather Underground PWS) |
-| `nwm_reach_id` | `""` | Optional (National Water Model reach) |
-| `upstream_pws_ids` | `[]` | Optional upstream PWS station IDs |
+| `nwm_reach_id` | `4196026` | NWM reach at the sensor site (open question #3) |
+| `upstream_pws_ids` | `KPAGLENB2`, `KPACLARK41` | Upstream PWS in the Clarks Summit corridor (open question #4) |
 | `stage_entity` | `sensor.creek_stage` | Creek node (ESPHome) level — set to the real entity |
 | `soil_moisture_entities` | WH51 #1, #2 | `..._soil_moisture_1` (near house / willow), `_2` (near creek) |
 | `onsite_rain_rate_entity` | `sensor.weather_station_rain_rate` | Ecowitt |

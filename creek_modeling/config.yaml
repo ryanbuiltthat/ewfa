@@ -29,8 +29,16 @@ options:
   min_events_for_ml: 10          # gate: threshold model until >= N storms captured
   google_floods_api_key: ""
   wu_api_key: ""
-  nwm_reach_id: ""
-  upstream_pws_ids: []
+  # NWM/NHDPlus reach carrying Ackerly Creek at the sensor site. The reach's own
+  # coordinates (41.5235, -75.7293) land ~100 m from the site at 41.5237,-75.7304
+  # (spec open question #3, resolved).
+  nwm_reach_id: "4196026"
+  # Upstream PWS in the Clarks Summit / Chinchilla / South Abington corridor that
+  # drains toward the site (spec open question #4, resolved). Spec §3 asks for 3-5
+  # stations; two are configured, so add more as reliable ones are identified.
+  upstream_pws_ids:
+    - KPAGLENB2
+    - KPACLARK41
   # --- HA input entities (Layer 1) ---
   stage_entity: sensor.creek_stage
   soil_moisture_entities:

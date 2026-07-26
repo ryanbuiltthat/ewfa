@@ -48,10 +48,10 @@
 |---|---|---|
 | ESPHome creek node | — (native HA API) | Real-time stage; the ground truth |
 | Ecowitt local integration in HA | — | Real-time on-site rain, soil moisture (WH51) |
-| Weather.com / WU PWS API | Key already held (via Ecowitt→WU upload; key in WU member settings) | Upstream neighbor PWS rainfall: Clarks Summit / South Abington / Chinchilla / Waverly corridor. **Task: enumerate and select 3–5 upstream stations by ID.** |
+| Weather.com / WU PWS API | Key already held (via Ecowitt→WU upload; key in WU member settings) | Upstream neighbor PWS rainfall: Clarks Summit / South Abington / Chinchilla / Waverly corridor. Stations in use: `KPAGLENB2`, `KPACLARK41` (open question #4 — 2 of the 3–5 wanted). |
 | NWS `api.weather.gov` | None (User-Agent header) | Gridded QPF (forecast precip) for 41.5237,-75.7304; active Flood Watch/Warning products for Lackawanna County |
-| NOAA NWPS API `api.water.noaa.gov/nwps/v1` | None | National Water Model reach forecast for Ackerly Creek segment (**task: resolve NWM/NHDPlus reach ID**); downstream gauges 01533990 / 01534000 for validation |
-| USGS Water Services | None | Instantaneous values, downstream gauges |
+| NOAA NWPS API `api.water.noaa.gov/nwps/v1` | None | National Water Model reach forecast for the Ackerly Creek segment — reach `4196026` (open question #3, resolved) |
+| USGS Water Services | None | Instantaneous values — gauges 01534860 (Lackawanna bl Leggetts Ck) and 01534000 (Tunkhannock Ck); see §1 |
 | Google Flood Forecasting API `floodforecasting.googleapis.com` | Google Cloud project + enable API + API key (pilot signup may apply) | `gauges:searchGaugesByArea` over watershed polygon → find real/virtual (hybas) gauges incl. non-quality-verified; gauge model thresholds (warning/danger/extreme); flood status; `v1.flashFloods` |
 | SNODAS (NOHRSC) | None | Snow water equivalent for grid cell — rain-on-snow feature |
 
@@ -84,6 +84,25 @@
 - Honest constraint: no meaningful model tuning until several storms are recorded. Early months = data collection + threshold-based alerting only.
 
 ## 6. Alert Tiers
+
+Implemented in `creek_modeling/app/tiers.py`, which emits the four escalation tiers below
+*plus* the explicit all-clear this section calls for — so the published scale is 0–4, with
+the tier number one higher than this table's original 0–3 numbering:
+
+| Level | Tier | Trigger basis | Example condition (tune with data) | Needs the creek gauge? |
+|---|---|---|---|---|
+| 0 | All-clear | Nothing elevated | — | — |
+| 1 | Advisory | Forecast risk | QPF ≥ X" in 24 h AND soil moisture ≥ Y% | No |
+| 2 | Watch | Upstream rain materializing | Upstream PWS accumulation ≥ X" in Y h, creek not yet responding | No |
+| 3 | Warning | Creek responding | Stage ≥ A ft OR rate-of-rise ≥ B in/min sustained C min | Yes |
+| 4 | Emergency | Flood in progress / imminent | Stage ≥ bank − margin OR model P(overbank) ≥ threshold | Yes |
+
+Advisory and Watch are deliberately gauge-independent: they run off forecast and rainfall
+features that flow without the creek node, so the system warns during the wait for the
+SEN0676. Warning and Emergency stay dormant until the node reports stage. Each tier also
+publishes the reasons that fired it.
+
+Original table, retained for reference:
 
 | Tier | Trigger basis | Example condition (tune with data) |
 |---|---|---|
@@ -126,8 +145,8 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 
 1. ~~HA install type on mini PC (HAOS/Supervised → add-on path; Container → sidecar docker-compose path).~~ **RESOLVED: HA install is HAOS.** Layer 2 modeling service is built as a local add-on — see [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1).
 2. Google Floods API: does a virtual gauge (hybas) land on Ackerly Creek or nearest SB Tunkhannock reach? What are its thresholds?
-3. ~~NWM reach ID for the Ackerly segment at 41.5237,-75.7304.~~ **RESOLVED** — set in the add-on's `nwm_reach_id` option.
-4. ~~Which 3–5 upstream PWS stations are reliable (uptime, tipping-bucket quality)?~~ **RESOLVED** — stations selected and set in `upstream_pws_ids`.
+3. ~~NWM reach ID for the Ackerly segment at 41.5237,-75.7304.~~ **RESOLVED: `4196026`** (reach position 41.5235,-75.7293, ~100 m from the site; verified live against the NWPS API).
+4. ~~Which 3–5 upstream PWS stations are reliable (uptime, tipping-bucket quality)?~~ **PARTLY RESOLVED: `KPAGLENB2`, `KPACLARK41`.** Two of the 3–5 wanted; add more from the Chinchilla / South Abington / Waverly corridor as reliable ones are identified.
 5. Exact low-water reference datum and surveyed bank height at the sensor site (measure at install).
 6. WiFi RSSI at the pole via the outdoor AP (bag test before final mount).
 7. WH51 readings are relative (0–100%) and site-specific. After the next soaking rain and a dry stretch, record the empirical "saturated" and "dry" values at each burial spot; these calibrate the Tier 0 soil-moisture threshold.
