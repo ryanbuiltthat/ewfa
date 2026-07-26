@@ -90,6 +90,21 @@ def test_highest_tier_wins_and_only_its_reasons_are_returned():
     assert reasons == ["stage 2.20 ft"]          # no advisory/watch noise
 
 
+def test_nws_products_force_promote_the_tier():
+    # Quiet instruments, but a forecaster has issued a product: escalate anyway (spec §6).
+    assert compute_tier(row(nws_flood_watch=1.0), 0.0)[:2] == (1, "Advisory")
+    assert compute_tier(row(nws_flood_warning=1.0), 0.0)[:2] == (2, "Watch")
+    assert compute_tier(row(nws_flash_flood_warning=1.0), 0.0)[:2] == (3, "Warning")
+    _, _, reasons = compute_tier(row(nws_flood_warning=1.0), 0.0)
+    assert reasons == ["NWS Flood Warning in effect"]
+
+
+def test_nws_floor_never_lowers_an_earned_tier():
+    # Stage already says Emergency; a mere Flood Watch must not pull it down.
+    tier, label, _ = compute_tier(row(stage_ft=2.9, nws_flood_watch=1.0), 0.0)
+    assert (tier, label) == (4, "Emergency")
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

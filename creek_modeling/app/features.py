@@ -51,6 +51,11 @@ class FeatureRow:
     usgs_tunkhannock_gage_ft: float | None = None
     usgs_tunkhannock_flow_cfs: float | None = None
     usgs_tunkhannock_rise_3h_ft: float | None = None
+    # NWS active alert products — 0/1 flags (spec §3/§6).
+    nws_flood_watch: float | None = None
+    nws_flood_warning: float | None = None
+    nws_flash_flood_warning: float | None = None
+    nws_alert_count: float | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)

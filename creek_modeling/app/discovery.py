@@ -211,6 +211,28 @@ class DiscoveryPublisher:
                         "icon": "mdi:trending-up"}),
                 )
             ),
+            # --- ingested features (Addendum C 2d): NWS active alert products ---
+            *(
+                ("binary_sensor", f"creek_{slug}", {
+                    "name": name,
+                    "state_topic": f"{b}/features",
+                    "value_template": f"{{{{ 'ON' if value_json.{key} else 'OFF' }}}}",
+                    "payload_on": "ON", "payload_off": "OFF",
+                    "device_class": "safety", "icon": icon})
+                for slug, key, name, icon in (
+                    ("nws_flood_watch", "nws_flood_watch",
+                     "Creek NWS Flood Watch", "mdi:weather-cloudy-alert"),
+                    ("nws_flood_warning", "nws_flood_warning",
+                     "Creek NWS Flood Warning", "mdi:home-flood"),
+                    ("nws_flash_flood_warning", "nws_flash_flood_warning",
+                     "Creek NWS Flash Flood Warning", "mdi:flash-alert"),
+                )
+            ),
+            ("sensor", "creek_nws_alert_count", {
+                "name": "Creek NWS Alert Count",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.nws_alert_count if value_json.nws_alert_count is not none else none }}",
+                "state_class": "measurement", "icon": "mdi:bell-alert-outline"}),
             # --- command buttons ---
             ("button", "creek_run_inference_now", {
                 "name": "Creek Run Inference Now",

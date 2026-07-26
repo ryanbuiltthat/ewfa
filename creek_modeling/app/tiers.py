@@ -18,6 +18,9 @@ and rainfall features that are already flowing, so the system issues useful warn
 before the SEN0676 is mounted. Warning/Emergency stay dormant (their inputs are None)
 until the creek node reports.
 
+Active NWS flood products additionally impose a *floor* on the tier (§6), so a forecaster
+issuing a warning escalates us regardless of what our own instruments show.
+
 Every rule that fires contributes a human-readable reason, published as an attribute so
 the dashboard can say *why* rather than just showing a number.
 
@@ -57,6 +60,17 @@ WARNING_PROBABILITY = 0.50
 # --- Tier 4 Emergency: overbank imminent (gauge required) ---
 EMERGENCY_STAGE_FT = 2.5           # bank top minus a 6 in margin
 EMERGENCY_PROBABILITY = 0.80
+
+# --- NWS product force-promotion floors (spec §6) ---
+# §6 states only "NWS Flood Warning for the county force-promotes to >= Tier 1", which in
+# that section's original 0-3 numbering is Watch — level 2 here. The Watch and Flash Flood
+# floors are extensions beyond the letter of the spec: a Flood Watch is by definition the
+# forecast-risk situation Advisory describes, and a Flash Flood Warning in a basin this
+# flashy (§1: rainfall-to-crest measured in tens of minutes) is materially more urgent
+# than an areal flood warning, so it floors at Warning.
+NWS_WATCH_FLOOR = 1                # Advisory
+NWS_WARNING_FLOOR = 2              # Watch — the rule §6 mandates
+NWS_FLASH_WARNING_FLOOR = 3        # Warning
 
 
 def _ge(value: float | None, threshold: float) -> bool:
@@ -101,6 +115,19 @@ def compute_tier(row: FeatureRow, flood_probability: float | None) -> tuple[int,
         reasons.append((4, f"stage {row.stage_ft:.2f} ft — near bank top"))
     if p >= EMERGENCY_PROBABILITY:
         reasons.append((4, f"model probability {p * 100:.0f}%"))
+
+    # --- NWS force-promotion (spec §6) ---
+    # These are floors, not additions: a forecaster issuing a product knows things our
+    # instruments do not, so an active warning sets a minimum tier no matter how quiet
+    # our own features look. They never *lower* a tier our sensors have already earned.
+    for active, floor, text in (
+        (row.nws_flood_watch, NWS_WATCH_FLOOR, "NWS Flood Watch in effect"),
+        (row.nws_flood_warning, NWS_WARNING_FLOOR, "NWS Flood Warning in effect"),
+        (row.nws_flash_flood_warning, NWS_FLASH_WARNING_FLOOR,
+         "NWS Flash Flood Warning in effect"),
+    ):
+        if active:
+            reasons.append((floor, text))
 
     if not reasons:
         return 0, TIER_LABELS[0], []

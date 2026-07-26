@@ -117,6 +117,15 @@ template:
         state: >
           {{ not has_value('sensor.ackerly_creek_modeling_creek_upstream_rain_3h') }}
 
+      - name: "Creek NWS Alerts Missing"
+        unique_id: creek_nws_alerts_missing
+        device_class: problem
+        # The alert feed reports 0 active products as 0, not as null — so an unavailable
+        # count means the API call itself is failing, and a Flood Warning could be in
+        # effect without us force-promoting the tier (spec §6).
+        state: >
+          {{ not has_value('sensor.ackerly_creek_modeling_creek_nws_alert_count') }}
+
       - name: "Creek NWM Data Missing"
         unique_id: creek_nwm_data_missing
         device_class: problem

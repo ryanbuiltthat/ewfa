@@ -102,6 +102,10 @@ label, and the reasons that fired:
 | 3 | Warning | stage, rate-of-rise | Yes |
 | 4 | Emergency | stage near bank top | Yes |
 
+An active NWS product additionally sets a **floor** on the tier, whatever our own sensors
+say (spec §6): Flood Watch → ≥ Advisory, Flood Warning → ≥ Watch, Flash Flood Warning →
+≥ Warning. A floor never lowers a tier the sensors have already earned.
+
 Levels 1–2 run entirely off forecast and rainfall data, so the system issues useful
 warnings before the SEN0676 is mounted. Levels 3–4 stay dormant until the ESPHome node
 reports stage. **All thresholds are placeholders** pending the surveyed datum (open

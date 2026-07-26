@@ -16,6 +16,7 @@ from pathlib import Path
 
 from ..config import Config
 from ..ha import HAClient
+from .alerts import NwsAlerts
 from .nwm import NwmReach
 from .nws import NwsQpf
 from .rain import RainAccumulator
@@ -35,6 +36,8 @@ FEATURE_KEYS = (
     "nwm_flow_cfs", "nwm_flow_max_cfs",
     # 2c — USGS downstream gauges
     *usgs_feature_keys(),
+    # 2d — NWS active alert products
+    "nws_flood_watch", "nws_flood_warning", "nws_flash_flood_warning", "nws_alert_count",
 )
 
 
@@ -49,9 +52,10 @@ class SourceCoordinator:
         latlon = ha.get_lat_lon()
         if latlon:
             self._sources.append(NwsQpf(*latlon))
-            log.info("NWS QPF enabled for lat/lon %.4f,%.4f", *latlon)
+            self._sources.append(NwsAlerts(*latlon))
+            log.info("NWS QPF + alerts enabled for lat/lon %.4f,%.4f", *latlon)
         else:
-            log.warning("No lat/lon from HA config — NWS QPF disabled")
+            log.warning("No lat/lon from HA config — NWS QPF and alerts disabled")
 
         if cfg.wu_api_key and cfg.upstream_pws_ids:
             self._sources.append(WuUpstream(cfg.wu_api_key, cfg.upstream_pws_ids, data_dir))

@@ -103,6 +103,20 @@ views:
           - entity: sensor.ackerly_creek_modeling_creek_qpf_24h
             name: Forecast rain (next 24 h)
 
+      # Active NWS products covering the site. Any of these floors the alert tier (§6).
+      - type: entities
+        title: NWS alerts
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.ackerly_creek_modeling_creek_nws_flash_flood_warning
+            name: Flash Flood Warning
+          - entity: binary_sensor.ackerly_creek_modeling_creek_nws_flood_warning
+            name: Flood Warning
+          - entity: binary_sensor.ackerly_creek_modeling_creek_nws_flood_watch
+            name: Flood Watch
+          - entity: sensor.ackerly_creek_modeling_creek_nws_alert_count
+            name: Active alerts (all types)
+
       - type: entities
         title: Upstream & model
         show_header_toggle: false
