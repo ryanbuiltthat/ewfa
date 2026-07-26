@@ -3,6 +3,25 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.2
+
+- **Fix five dashboard cards showing "Entity not found" on a healthy system.** Home
+  Assistant mints entity IDs from the device name plus the entity *name*, not from the
+  `object_id` the add-on publishes — `object_id` is a suggestion and is not honoured here.
+  Most entities hid this because their name slugifies to exactly their object_id, so both
+  rules agree by coincidence. Five did not, and the dashboard referenced the object_id form:
+  - `creek_nws_alerts_missing` → actually `..._creek_nws_alert_feed_missing`
+  - `creek_last_nightly` → `..._creek_last_nightly_run`
+  - `creek_api_index` → `..._creek_antecedent_precipitation_index`
+  - `creek_usgs_leggetts_gage` → `..._creek_usgs_leggetts_gage_height`
+  - `creek_usgs_tunkhannock_gage` → `..._creek_usgs_tunkhannock_gage_height`
+- `DiscoveryPublisher.entity_ids()` now derives the real IDs, and a new test checks every
+  entity the dashboard references against the add-on's entities, the HA package's, and a
+  short allow-list of Ecowitt/ESPHome ones. Verified to fail when the old reference is
+  restored, so it is not passing vacuously.
+- The `object_id` values are deliberately left alone: they form each entity's `unique_id`,
+  so changing them would orphan the entities already registered in Home Assistant.
+
 ## 0.11.1
 
 - **Fix the `Creek Modeling Service Stale` watchdog** (`ha-packages/creek_warning.yaml`).

@@ -1,0 +1,105 @@
+"""The dashboard must reference entity IDs the add-on actually creates.
+
+Regression guard. Home Assistant mints entity_ids from the device name plus the entity
+*name*; the `object_id` we publish is only a suggestion and is not honoured. Most entities
+hide that because their name slugifies to exactly their object_id — but five did not, and
+the dashboard referenced the object_id form for all five, so those cards showed "Entity not
+found" on a perfectly healthy system.
+
+Run: python creek_modeling/tests/test_dashboard_entities.py
+"""
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "creek_modeling"))
+
+from app.discovery import DiscoveryPublisher  # noqa: E402
+
+DASHBOARD = ROOT / "dashboards" / "creek_flood_watch.yaml"
+PACKAGE = ROOT / "ha-packages" / "creek_warning.yaml"
+
+# Entities that legitimately come from outside the add-on.
+EXTERNAL = {
+    "sensor.creek_stage",                              # ESPHome creek node (not built yet)
+    "sensor.outside_weather_station_soil_moisture_1",  # Ecowitt
+    "sensor.outside_weather_station_soil_moisture_2",
+    "sensor.weather_station_rain_rate",
+    "sensor.weather_station_daily_rain",
+}
+
+ENTITY_PATTERN = re.compile(r"\b(?:binary_sensor|sensor|button)\.[a-z0-9_]+\b")
+
+
+def addon_entity_ids():
+    return set(DiscoveryPublisher(lambda *a: None, "creek").entity_ids().values())
+
+
+def package_entity_ids():
+    doc = yaml.safe_load(PACKAGE.read_text(encoding="utf-8"))
+    ids = set()
+    for block in doc.get("template") or []:
+        for domain, entries in block.items():
+            for entry in entries:
+                ids.add(f"{domain}.{entry['unique_id']}")
+    return ids
+
+
+def dashboard_references():
+    """Every entity id the dashboard names, from `entity:` keys and Jinja templates."""
+    doc = yaml.safe_load(DASHBOARD.read_text(encoding="utf-8"))
+    found = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in ("entity", "entity_id") and isinstance(value, str):
+                    found.add(value)
+                elif isinstance(value, str):
+                    found.update(ENTITY_PATTERN.findall(value))
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(doc)
+    return found
+
+
+def test_every_dashboard_entity_exists_somewhere():
+    known = addon_entity_ids() | package_entity_ids() | EXTERNAL
+    missing = sorted(dashboard_references() - known)
+    assert not missing, f"dashboard references entities nothing provides: {missing}"
+
+
+def test_addon_entity_ids_come_from_the_name_not_the_object_id():
+    ids = DiscoveryPublisher(lambda *a: None, "creek").entity_ids()
+    # The case that broke: object_id creek_nws_alerts_missing, name "...Alert Feed...".
+    assert ids["creek_nws_alerts_missing"] == (
+        "binary_sensor.ackerly_creek_modeling_creek_nws_alert_feed_missing")
+    # And one where the two happen to agree, so the rule is not accidentally inverted.
+    assert ids["creek_stage_stale"] == (
+        "binary_sensor.ackerly_creek_modeling_creek_stage_stale")
+
+
+def test_package_entities_are_unprefixed():
+    # Template entities get no device prefix — mixing the two conventions is what caused
+    # the earlier round of "Entity not found".
+    for entity_id in package_entity_ids():
+        assert "ackerly_creek_modeling" not in entity_id, entity_id
+
+
+def main():
+    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for t in tests:
+        t()
+        print("PASS", t.__name__)
+    print(f"\n{len(tests)} passed")
+
+
+if __name__ == "__main__":
+    main()

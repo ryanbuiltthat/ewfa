@@ -5,12 +5,16 @@ Publishing retained config messages under
 (and update) the `creek_*` sensors and buttons automatically — no HA package or
 `configuration.yaml` edit for them, and they refresh whenever the add-on updates.
 
-Because every entity carries a `device` block, Home Assistant prefixes the device name
-when it mints the entity_id — the published slug `creek_flood_probability` lands as
-`sensor.ackerly_creek_modeling_creek_flood_probability`. That prefix is what the
-dashboard references; only entities defined here get it. The HA-side template sensors in
-`ha-packages/creek_warning.yaml` (soil mean, ponding, the stale watchdogs) and the
-ESPHome creek node are *not* published here and keep their unprefixed IDs.
+ENTITY IDs: Home Assistant mints them from the device name plus the entity **name** —
+NOT from the `object_id` published below, which is only a suggestion and is not honoured.
+So "Creek Flood Probability" on the "Ackerly Creek Modeling" device becomes
+`sensor.ackerly_creek_modeling_creek_flood_probability`. Most entities here hide the
+distinction because their name slugifies to exactly their object_id; where the two differ,
+the name wins. Use `entity_ids()` rather than assuming, and the dashboard is checked
+against it in `tests/test_dashboard_entities.py`.
+
+Only entities defined here get the device prefix. The HA-side template sensor in
+`ha-packages/creek_warning.yaml` and the ESPHome creek node keep unprefixed IDs.
 
 All entities share one `device` and an `availability_topic` driven by the MQTT LWT, so
 they show *unavailable* when the add-on is stopped.
@@ -19,8 +23,14 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 log = logging.getLogger("app.discovery")
+
+
+def _slugify(text: str) -> str:
+    """Mirror Home Assistant's entity_id slugification."""
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", text.lower())).strip("_")
 
 DISCOVERY_PREFIX = "homeassistant"
 NODE_ID = "creek_modeling"
@@ -319,6 +329,26 @@ class DiscoveryPublisher:
                 "name": "Creek Rollback Model",
                 "command_topic": f"{b}/cmd/rollback", "payload_press": "run", "icon": "mdi:undo-variant"}),
         ]
+
+    def entity_ids(self) -> dict[str, str]:
+        """{slug: entity_id Home Assistant will actually mint}.
+
+        HA derives the entity_id from the device name plus the entity's **name**, not from
+        the `object_id` we publish — `object_id` is documented as a suggestion and is not
+        honoured here. So "Creek NWS Alert Feed Missing" on the "Ackerly Creek Modeling"
+        device becomes `binary_sensor.ackerly_creek_modeling_creek_nws_alert_feed_missing`,
+        regardless of its `creek_nws_alerts_missing` object_id.
+
+        Most entities hide this because their name slugifies to exactly their object_id, so
+        the two rules agree by coincidence. The ones where they diverge produced dashboard
+        references to entities that never existed. Deriving IDs here — and checking the
+        dashboard against them in the tests — keeps that from recurring.
+        """
+        device_name = self._device()["name"]
+        out = {}
+        for component, slug, cfg in self._specs():
+            out[slug] = f"{component}.{_slugify(device_name + ' ' + cfg['name'])}"
+        return out
 
     def configs(self) -> list[tuple[str, dict]]:
         """Build (discovery_topic, full_config) pairs — exposed for testing."""
