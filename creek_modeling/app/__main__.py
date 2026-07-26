@@ -24,10 +24,12 @@ from .dataset import DatasetWriter
 from .discovery import DiscoveryPublisher
 from .features import DERIVED_KEYS, FeatureBuilder
 from .health import HealthTracker
+from .lag import estimate_lag
 from .ha import HAClient
 from .model import Model
 from .mqtt_client import MqttClient
 from .registry import ModelRegistry
+from .storms import StormLog
 from .sources import FEATURE_KEYS, SourceCoordinator
 from .tiers import compute_tier
 
@@ -61,12 +63,12 @@ def _publish_registry(mqtt: MqttClient, registry: ModelRegistry) -> None:
 def _run_inference_once(
     features: FeatureBuilder, model: Model, dataset: DatasetWriter,
     mqtt: MqttClient, status: dict, health: HealthTracker = None, sources=None,
+    storms: StormLog = None,
 ) -> str:
     row = features.build()
     pred = model.predict(row)
     mqtt.publish("flood_probability", {"value": pred.flood_probability, "method": pred.method})
     mqtt.publish("predicted_crest", {"value": pred.predicted_crest_ft})
-    mqtt.publish("lag_estimate", {"value": pred.lag_estimate_min})
     tier, label, reasons = compute_tier(row, pred.flood_probability)
     mqtt.publish("alert_tier", {"value": tier, "label": label, "reasons": reasons,
                                 "why": "; ".join(reasons) or "nothing elevated"})
@@ -82,17 +84,45 @@ def _run_inference_once(
         mqtt.publish("status/health",
                      health.evaluate(row, sources.health(), sources.configured()))
     dataset.append_row(row)
+    if storms is not None:
+        if storms.observe(row, tier) is not None:
+            _publish_storms(mqtt, storms)
     status["last_inference_at"] = _now_iso()
     return f"p={pred.flood_probability} tier={tier} method={pred.method}"
 
 
+def _publish_storms(mqtt: MqttClient, storms: StormLog) -> None:
+    latest = storms.latest()
+    mqtt.publish("status/storms", {
+        "event_count": storms.count(),
+        "open": bool(latest and latest.get("ended_ts") is None),
+        "latest": latest,
+    })
+
+
 def _nightly_batch(
     cfg: Config, dataset: DatasetWriter, mqtt: MqttClient, model: Model,
-    registry: ModelRegistry, status: dict,
+    registry: ModelRegistry, status: dict, storms: StormLog = None,
 ) -> str:
-    rows = dataset.row_count()
+    # Fold yesterday's part files into the Parquet dataset (§4 "append day's data").
+    rows = dataset.consolidate()
+    if storms is not None:
+        # The storm log is the source of truth for the ML gate (§5).
+        registry.set_event_count(storms.count())
+        _publish_storms(mqtt, storms)
     events = model.event_count()
-    log.info("Nightly batch: dataset=%d rows, events=%d", rows, events)
+
+    # First lag/response estimate (§7 Phase 3). Falls back to a downstream gauge while the
+    # creek node is missing — that number is the sanity check, not Ackerly's lag.
+    lag = estimate_lag(dataset.frame())
+    mqtt.publish("status/lag", lag)
+    mqtt.publish("lag_estimate", {"value": lag["lag_minutes"],
+                                  "response": lag["response"],
+                                  "correlation": lag["correlation"],
+                                  "reason": lag["reason"]})
+
+    log.info("Nightly batch: dataset=%d rows, events=%d, lag=%s",
+             rows, events, lag["lag_minutes"])
     # Phase 4: append day's data, recalibrate/retrain, version artifact via
     # registry.set_candidate(version, metrics), log skill metrics.
     method = "ml" if events >= cfg.min_events_for_ml else "threshold"
@@ -109,7 +139,7 @@ def _nightly_batch(
         },
     )
     _publish_registry(mqtt, registry)
-    return f"rows={rows} events={events} method={method}"
+    return f"rows={rows} events={events} lag={lag['lag_minutes']} method={method}"
 
 
 def _process_commands(
@@ -157,6 +187,7 @@ def main() -> int:
     health = HealthTracker()
     model = Model(cfg, registry)
     dataset = DatasetWriter(data_dir)
+    storms = StormLog(data_dir)
 
     status = {
         "state": "idle",
@@ -169,8 +200,9 @@ def main() -> int:
     processor = CommandProcessor(
         {
             "run_inference": lambda: _run_inference_once(
-                features, model, dataset, mqtt, status, health, sources),
-            "retrain": lambda: _nightly_batch(cfg, dataset, mqtt, model, registry, status),
+                features, model, dataset, mqtt, status, health, sources, storms),
+            "retrain": lambda: _nightly_batch(
+                cfg, dataset, mqtt, model, registry, status, storms),
             "promote": lambda: _promote(mqtt, registry),
             "rollback": lambda: _rollback(mqtt, registry),
         }
@@ -179,6 +211,7 @@ def main() -> int:
     # Prime the dashboard sensors immediately.
     _publish_pipeline(mqtt, status, "idle", "none")
     _publish_registry(mqtt, registry)
+    _publish_storms(mqtt, storms)
 
     last_nightly_day: int | None = None
     interval = max(1, cfg.fast_loop_minutes) * 60
@@ -187,7 +220,8 @@ def main() -> int:
         while _running:
             _publish_pipeline(mqtt, status, "running", "inference")
             try:
-                _run_inference_once(features, model, dataset, mqtt, status, health, sources)
+                _run_inference_once(
+                    features, model, dataset, mqtt, status, health, sources, storms)
             except Exception:  # a transient feature/predict error must not kill the loop
                 log.exception("Inference failed")
                 status["last_error"] = "inference failed (see log)"
@@ -198,7 +232,7 @@ def main() -> int:
             now = datetime.now()
             if now.hour == cfg.nightly_retrain_hour and now.day != last_nightly_day:
                 _publish_pipeline(mqtt, status, "running", "retrain")
-                _nightly_batch(cfg, dataset, mqtt, model, registry, status)
+                _nightly_batch(cfg, dataset, mqtt, model, registry, status, storms)
                 _publish_pipeline(mqtt, status, "idle", "none")
                 last_nightly_day = now.day
 

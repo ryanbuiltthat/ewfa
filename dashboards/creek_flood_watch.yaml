@@ -215,6 +215,24 @@ views:
             name: Last command
             secondary_info: last-changed
 
+      # Phase 3: the storm record and the lag it is being used to measure.
+      - type: entities
+        title: Storms & lag
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.ackerly_creek_modeling_creek_storm_in_progress
+            name: Storm in progress
+          - entity: sensor.ackerly_creek_modeling_creek_event_count
+            name: Storms recorded
+          - type: divider
+          - entity: sensor.ackerly_creek_modeling_creek_lag_estimate
+            name: Rainfall → response lag
+          # Which series the lag was fitted against. Until the creek node exists this
+          # reads as a USGS proxy — a different, larger basin, so that number is a sanity
+          # check on the method, NOT Ackerly's warning window.
+          - entity: sensor.ackerly_creek_modeling_creek_lag_response_series
+            name: ↳ fitted against
+
       - type: entities
         title: Pipeline & model status
         show_header_toggle: false

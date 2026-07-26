@@ -119,9 +119,18 @@ question #5), WH51 calibration (#7), and observed storms (Phase 3).
 ## Persistent storage (`/data`)
 
 ```text
-/data/datasets/dataset.parquet   nightly-appended feature/label rows
+/data/datasets/parts/*.jsonl     today's rows, appended each fast loop
+/data/datasets/dataset.parquet   consolidated nightly from completed parts
 /data/events.sqlite              annotated storm event log
 /data/models/registry.json       versioned artifacts + skill metrics
+/data/state/*.json               rain/API/SNODAS accumulator state
+```
+
+Annotating a storm (the "annotated" half of the Phase 3 event log) is a SQLite update:
+
+```sh
+sqlite3 /data/events.sqlite \
+  "UPDATE storm_events SET notes='basement dry; culvert ran full' WHERE id=3;"
 ```
 
 ## Status

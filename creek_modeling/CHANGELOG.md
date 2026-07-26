@@ -3,6 +3,39 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.0 — Phase 3 (Collect & correlate)
+
+- **Storm event log** (`app/storms.py`, spec §7): detects storms from the live feature
+  stream and records them in `events.sqlite` with onset conditions (API, soil moisture,
+  SWE, rain-on-snow), running peaks (rain, upstream rain, QPF, stage, rate-of-rise,
+  downstream rise, alert tier) and a `notes` column for annotation. Events are defined by
+  *rainfall*, not by creek response, so the record being built now stays valid once the
+  SEN0676 is mounted — response columns are simply null until then. A brief lull does not
+  split one storm in two, and a restart mid-storm resumes the open event.
+  - This also makes `min_events_for_ml` meaningful for the first time: the table existed
+    but nothing ever wrote to it, so the threshold→ML gate (§5) could never open. The
+    nightly batch now sets the registry's event count from completed storms.
+- **Nightly dataset builder** (`app/dataset.py`, §4): the fast loop appends to a per-day
+  JSONL part file and the nightly batch folds completed parts into `dataset.parquet`.
+  Previously every fast loop read the entire Parquet dataset, concatenated one row and
+  rewrote it — ~700 ms per append after a year on this schema, but the real cost was
+  rewriting the whole dataset 288 times a day onto an SSD. Consolidation is atomic
+  (write-temp-then-replace), de-duplicates by timestamp, and survives a torn final line
+  from an unclean shutdown without losing the rest of the day.
+- **Lag estimation** (`app/lag.py`, §1/§7): cross-correlates rainfall against the response
+  series to estimate the rainfall→crest lag §1 calls "the warning window". Correlates on
+  first *differences* of the response, since rainfall drives the rise while the level
+  itself is dominated by baseflow. Falls back to a USGS downstream gauge while the creek
+  node is missing — a different, larger basin, so the result is labelled with the series
+  used and must not be read as Ackerly's lag. That fallback is the "downstream-gauge
+  sanity comparison" §7 asks for.
+  - Near-ties resolve to the *shorter* lag. Storms recur, so shifting rain forward by a
+    whole inter-storm interval lines it up with the next storm's rise and scores just as
+    well — measurably better, even, since the longer shift drops the worst-fitting edge
+    samples. Physically the earliest lag that explains the response is the causal one.
+  - Refuses to guess: reports `lag_minutes: null` with a reason when there is too little
+    data, no rain on record, or the best correlation is below 0.30.
+
 ## 0.10.0
 
 - **Watchdogs and soil templates move into the add-on.** The soil-moisture mean, the ponding

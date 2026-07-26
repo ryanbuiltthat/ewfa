@@ -72,6 +72,7 @@ class DiscoveryPublisher:
                 "name": "Creek Lag Estimate",
                 "state_topic": f"{b}/lag_estimate",
                 "value_template": "{{ value_json.value if value_json.value is not none else 'unknown' }}",
+                "json_attributes_topic": f"{b}/lag_estimate",
                 "unit_of_measurement": "min", "state_class": "measurement", "icon": "mdi:timer-sand"}),
             ("sensor", "creek_alert_tier", {
                 "name": "Creek Alert Tier",
@@ -117,9 +118,21 @@ class DiscoveryPublisher:
                 "state_class": "measurement", "icon": "mdi:table"}),
             ("sensor", "creek_event_count", {
                 "name": "Creek Event Count",
-                "state_topic": f"{b}/status/registry",
+                "state_topic": f"{b}/status/storms",
                 "value_template": "{{ value_json.event_count }}",
+                "json_attributes_topic": f"{b}/status/storms",
                 "state_class": "measurement", "icon": "mdi:weather-lightning-rainy"}),
+            ("binary_sensor", "creek_storm_in_progress", {
+                "name": "Creek Storm In Progress",
+                "state_topic": f"{b}/status/storms",
+                "value_template": "{{ 'ON' if value_json.open else 'OFF' }}",
+                "payload_on": "ON", "payload_off": "OFF",
+                "device_class": "moisture", "icon": "mdi:weather-pouring"}),
+            ("sensor", "creek_lag_response_series", {
+                "name": "Creek Lag Response Series",
+                "state_topic": f"{b}/status/lag",
+                "value_template": "{{ value_json.response if value_json.response is not none else 'none' }}",
+                "json_attributes_topic": f"{b}/status/lag", "icon": "mdi:chart-timeline-variant"}),
             ("sensor", "creek_active_model", {
                 "name": "Creek Active Model",
                 "state_topic": f"{b}/status/registry",

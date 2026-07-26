@@ -124,7 +124,17 @@ ESPHome YAML for creek node (SEN0676 Modbus, power telemetry, adaptive reporting
 `ha-packages/creek_warning.yaml` with all REST sensors; enumerate upstream WU station IDs; resolve NWM reach ID; register Google Floods API and run `searchGaugesByArea` over the watershed; SNODAS fetch; data-quality watchdogs.
 
 **Phase 3 — Collect & correlate (months 1–3):**
-Nightly dataset builder; storm event log (annotated); first lag/response estimates; threshold-based Tier 2/3 alerts live (conservative values); downstream-gauge sanity comparisons.
+~~Nightly dataset builder~~ **done** (`app/dataset.py`: per-day JSONL parts, consolidated
+nightly into Parquet); ~~storm event log (annotated)~~ **done** (`app/storms.py`, events
+defined by rainfall so the record stays valid once the gauge lands); ~~first lag/response
+estimates~~ **done** (`app/lag.py`, cross-correlation); ~~threshold-based alerts live
+(conservative values)~~ **done** (`app/tiers.py`, Phase 2 — and the forecast-driven tiers
+run without the gauge); ~~downstream-gauge sanity comparisons~~ **done** (lag falls back to
+USGS and labels itself as a proxy).
+
+What Phase 3 still needs is **time, not code**: storms have to actually happen. The lag
+estimate stays a USGS-proxy number until the SEN0676 is mounted, and the thresholds
+throughout stay uncalibrated until the storm log has entries to fit against.
 
 **Phase 4 — Predict (after ~10 events):**
 Fast-loop inference service; model registry + nightly retrain; tier logic upgraded from thresholds to probability; skill dashboard (lead time achieved, false alarm rate).

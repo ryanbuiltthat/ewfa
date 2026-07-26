@@ -20,11 +20,11 @@ def test_topics_and_counts():
     sensors = [t for t, _ in pairs if "/sensor/" in t]
     binaries = [t for t, _ in pairs if "/binary_sensor/" in t]
     buttons = [t for t, _ in pairs if "/button/" in t]
-    # 15 status/model + 8 (2a incl. API index) + 8 (2b) + 6 (2c) + 1 (2d) + 2 (2e)
-    # + 1 soil mean (migrated out of the HA package)
-    assert len(sensors) == 41, len(sensors)
-    # 3 NWS flags + rain-on-snow + ponding + 9 watchdogs (migrated from the package)
-    assert len(binaries) == 14, len(binaries)
+    # 16 status/model (incl. Phase 3 lag series) + 8 (2a incl. API index) + 8 (2b)
+    # + 6 (2c) + 1 (2d) + 2 (2e) + 1 soil mean (migrated out of the HA package)
+    assert len(sensors) == 42, len(sensors)
+    # 3 NWS flags + rain-on-snow + ponding + storm-in-progress + 9 watchdogs
+    assert len(binaries) == 15, len(binaries)
     assert len(buttons) == 4, len(buttons)
     for topic, _ in pairs:
         assert topic.startswith("homeassistant/")
@@ -75,7 +75,7 @@ def test_rain_and_qpf_sensors_present():
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 59
+    assert len(published) == 61
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON
@@ -95,6 +95,9 @@ def test_every_value_template_resolves_against_a_published_payload():
         "features": set(FEATURE_KEYS) | set(DERIVED_KEYS),
         "status/health": set(WATCHDOG_KEYS),
         "soil": {"mean_pct", "ponding", "near_house_pct", "near_creek_pct"},
+        "status/storms": {"event_count", "open", "latest"},
+        "status/lag": {"lag_minutes", "correlation", "response", "rain_series",
+                       "samples", "reason"},
     }
     pub, _ = build()
     missing = []
