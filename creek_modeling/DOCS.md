@@ -70,9 +70,9 @@ Set these on the **Configuration** tab.
 | `nwm_reach_id` | `4196026` | NWM reach at the sensor site (open question #3) |
 | `upstream_pws_ids` | `KPAGLENB2`, `KPACLARK41` | Upstream PWS in the Clarks Summit corridor (open question #4) |
 | `stage_entity` | `sensor.creek_stage` | Creek node (ESPHome) level — set to the real entity |
-| `soil_moisture_entities` | WH51 #1, #2 | `..._soil_moisture_1` (near house / willow), `_2` (near creek) |
-| `onsite_rain_rate_entity` | `sensor.weather_station_rain_rate` | Ecowitt |
-| `onsite_rain_daily_entity` | `sensor.weather_station_daily_rain` | Ecowitt |
+| `soil_moisture_entities` | WH51 #1, #2 | `..._soil_moisture_field` (near house), `..._soil_moisture_willow` (near creek); order is significant |
+| `onsite_rain_rate_entity` | `sensor.outside_weather_station_rain_intensity` | Ecowitt |
+| `onsite_rain_daily_entity` | `sensor.outside_weather_station_rain_daily` | Ecowitt |
 | `usgs_downstream` | `true` | Poll USGS 01534860 / 01534000 (free, no key) for lag validation |
 | `snodas_swe` | `true` | Daily SNODAS snow-water-equivalent for the site cell (free, no key) |
 | `onsite_temp_entity` | `sensor.weather_station_outdoor_temperature` | Ecowitt; needed for the rain-on-snow flag |

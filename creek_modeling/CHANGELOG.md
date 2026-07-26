@@ -3,6 +3,30 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.6
+
+- **Ecowitt entity defaults corrected.** `84ff4f5` fixed the dashboard to the real entity
+  IDs; the add-on defaults, docs and the dashboard regression test still held three older
+  spellings between them. All now agree:
+
+  | Option | Was | Now |
+  |---|---|---|
+  | `onsite_rain_rate_entity` | `sensor.weather_station_rain_rate` | `sensor.outside_weather_station_rain_intensity` |
+  | `onsite_rain_daily_entity` | `sensor.weather_station_daily_rain` | `sensor.outside_weather_station_rain_daily` |
+  | `soil_moisture_entities[0]` | `..._soil_moisture_1` | `..._soil_moisture_field` (near house) |
+  | `soil_moisture_entities[1]` | `..._soil_moisture_2` | `..._soil_moisture_willow` (near creek) |
+
+  **These are install-time defaults only — a running add-on keeps the options already
+  stored, so check the Configuration tab.** A rain entity pointing at an ID that does not
+  exist reads as no data, and every on-site rain feature (`rain_rate_in_hr`,
+  `rain_{1,3,6,24,72}h_in`, and the API index that rides on them) stays null. Tier 2 Watch
+  is driven by exactly those, so it cannot fire. `test_dashboard_entities.py` was the only
+  thing that caught the drift, and only for the dashboard.
+
+- `onsite_temp_entity` is **left at `sensor.weather_station_outdoor_temperature` and is
+  probably also wrong** — the correct ID was not among the ones corrected upstream. It
+  feeds only the rain-on-snow flag, so nothing is affected until winter.
+
 ## 0.11.5
 
 - **QPF no longer decays as a forecast storm approaches.** Proration now runs over each

@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.11.5"
+version: "0.11.6"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa
@@ -42,12 +42,13 @@ options:
   # --- HA input entities (Layer 1) ---
   stage_entity: sensor.creek_stage
   soil_moisture_entities:
-    # WH51 #1 — near the house, by the willow tree (low-lying, ponds early)
-    - sensor.outside_weather_station_soil_moisture_1
+    # Order is significant: [0] -> soil_moisture_near_house_pct, [1] -> ..._near_creek_pct.
+    # WH51 #1 — near the house (low-lying, ponds early)
+    - sensor.outside_weather_station_soil_moisture_field
     # WH51 #2 — furthest from house, closest to the creek (low-lying, ponds early)
-    - sensor.outside_weather_station_soil_moisture_2
-  onsite_rain_rate_entity: sensor.weather_station_rain_rate
-  onsite_rain_daily_entity: sensor.weather_station_daily_rain
+    - sensor.outside_weather_station_soil_moisture_willow
+  onsite_rain_rate_entity: sensor.outside_weather_station_rain_intensity
+  onsite_rain_daily_entity: sensor.outside_weather_station_rain_daily
   # Nearest USGS gauges (01534860 Lackawanna/Leggetts, 01534000 Tunkhannock) — free, no key.
   # Validation/lag reference only; not a stand-in for creek level.
   usgs_downstream: true
