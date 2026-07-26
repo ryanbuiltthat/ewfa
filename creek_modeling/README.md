@@ -52,7 +52,7 @@ the add-on. Only two things need a one-time manual step: the Layer-1 package
 | `stage_entity` | `sensor.creek_stage` | Creek node (ESPHome) level — set to the real entity |
 | `soil_moisture_entities` | WH51 #1, #2 | `..._soil_moisture_willow` (near house), `..._soil_moisture_field` (near creek) — both low-lying, pond early. Order is significant. |
 | `onsite_rain_rate_entity` | `sensor.outside_weather_station_rain_intensity` | Ecowitt |
-| `onsite_rain_daily_entity` | `sensor.outside_weather_station_rain_daily` | Ecowitt |
+| `onsite_rain_daily_entity` | `sensor.outside_weather_station_rain_24hr` | Ecowitt; currently unused |
 | `min_events_for_ml` | `10` | Stay on threshold model until ≥ N storms captured |
 
 ## Model features (spec §5)

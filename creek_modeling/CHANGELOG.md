@@ -3,6 +3,20 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.8
+
+- `onsite_rain_rate_entity` **confirmed** as `sensor.outside_weather_station_rain_intensity`
+  by the owner. This is the one that matters: `rain.py` integrates rate x dt into the
+  rolling `rain_{1,3,6,24,72}h_in` accumulations, which drive Tier 2 Watch and feed the
+  Antecedent Precipitation Index.
+- `onsite_rain_daily_entity` set to `sensor.outside_weather_station_rain_24hr`, and
+  **documented as unused**: it is parsed into `Config` and read by nothing — no source
+  polls it and no feature derives from it. The rolling accumulations come from the rate
+  entity, not from here. Setting it has no effect on anything today; it renders a form
+  field that does nothing. Left in place rather than removed so stored options are not
+  invalidated — wiring it up (as a midnight-reset `rain_today_in` cross-check against the
+  integrated accumulator) or dropping it are both open.
+
 ## 0.11.7
 
 - **Soil probe mapping corrected — the two probes were swapped in 0.11.6.** The willow is
