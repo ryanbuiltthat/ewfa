@@ -3,10 +3,16 @@
 #   homeassistant:
 #     packages: !include_dir_named ha-packages
 #
-# STARTER SCOPE: WH51 soil-moisture template sensors + a Tier 0 Advisory placeholder.
-# REST sensors (NWS QPF / NWPS / USGS / WU PWS / SNODAS), rate-of-rise, multi-window rain
-# accumulations, the Antecedent Precipitation Index, and Tier 1–3 automations (spec §4/§6)
-# are added in Phase 2+. Placeholder thresholds are marked and MUST be calibrated.
+# SCOPE: the genuinely HA-side pieces only — WH51 soil-moisture templates, watchdogs that
+# observe other integrations, and the tier notification automation. Ingestion (rain
+# accumulations, NWS QPF, WU upstream, NWM reach, USGS downstream) and tier *evaluation*
+# live in the add-on and arrive via MQTT discovery (spec Addenda B/C).
+#
+# ENTITY-ID CONVENTION: add-on entities carry the device-name prefix HA applies to
+# MQTT-discovery entities — `sensor.ackerly_creek_modeling_creek_*`. Entities defined in
+# THIS file, and the ESPHome creek node, do not: they are plain `sensor.creek_*`.
+#
+# Placeholder thresholds are marked and MUST be calibrated (open questions #5/#7).
 
 template:
   - sensor:
@@ -51,8 +57,8 @@ template:
       # Sensor-fault watchdogs (spec §4): ON = a source has gone stale/missing. These are
       # HA-side by nature (they observe other integrations + the add-on's liveness) so they
       # stay in this package rather than moving to add-on MQTT discovery. Each guards against
-      # the entity not existing yet (Phase 1/2) via short-circuit. sensor.creek_pipeline_state
-      # is auto-created by the add-on's MQTT discovery.
+      # the entity not existing yet (Phase 1/2) via short-circuit. The prefixed
+      # sensor.ackerly_creek_modeling_* entities are auto-created by the add-on's discovery.
       - name: "Creek Stage Stale"
         unique_id: creek_stage_stale
         device_class: problem
@@ -73,51 +79,120 @@ template:
         unique_id: creek_rain_rate_stale
         device_class: problem
         state: >
-          {% set e = states.sensor.outside_weather_station_rain_rate %}
+          {% set e = states.sensor.weather_station_rain_rate %}
           {{ e is none or e.state in ['unknown', 'unavailable']
              or (now() - e.last_changed).total_seconds() > 3600 }}
 
       - name: "Creek Modeling Service Stale"
         unique_id: creek_modeling_service_stale
         device_class: problem
-        # The add-on publishes pipeline status every fast loop (default 5 min). No update
-        # in 15 min means the service is likely stopped or wedged. (Its MQTT LWT also flips
-        # the discovered entities to unavailable when it disconnects.)
+        # The add-on publishes pipeline status every fast loop (default 5 min), toggling
+        # idle/running, so last_changed tracks liveness. No update in 15 min means the
+        # service is likely stopped or wedged. (Its MQTT LWT also flips the discovered
+        # entities to unavailable when it disconnects.)
         state: >
-          {% set e = states.sensor.creek_pipeline_state %}
+          {% set e = states.sensor.ackerly_creek_modeling_creek_pipeline_state %}
           {{ e is none or e.state in ['unknown', 'unavailable']
              or (now() - e.last_changed).total_seconds() > 900 }}
 
+      # Ingest-source watchdogs. These deliberately test for a *value* rather than for
+      # last_changed: the add-on republishes every feature each fast loop, but a feature
+      # that legitimately sits at 0.00 in (no rain for a day) never changes state, so a
+      # staleness check would false-alarm constantly. A source that fails with no cached
+      # value publishes null instead, which lands as unknown/unavailable — that is the
+      # real signal. Add-on downtime is already covered above and by the MQTT LWT.
+      - name: "Creek Forecast Data Missing"
+        unique_id: creek_forecast_data_missing
+        device_class: problem
+        # NWS QPF — the Tier 1 Advisory input. Without it no forecast-driven tier fires.
+        state: >
+          {{ not has_value('sensor.ackerly_creek_modeling_creek_qpf_6h')
+             or not has_value('sensor.ackerly_creek_modeling_creek_qpf_24h') }}
+
+      - name: "Creek Upstream Data Missing"
+        unique_id: creek_upstream_data_missing
+        device_class: problem
+        # WU upstream PWS — the Tier 2 Watch input. Fires if every configured station is
+        # down or the API key/station IDs are wrong.
+        state: >
+          {{ not has_value('sensor.ackerly_creek_modeling_creek_upstream_rain_3h') }}
+
+      - name: "Creek NWM Data Missing"
+        unique_id: creek_nwm_data_missing
+        device_class: problem
+        state: >
+          {{ not has_value('sensor.ackerly_creek_modeling_creek_nwm_flow') }}
+
+      - name: "Creek Downstream Gauge Missing"
+        unique_id: creek_downstream_gauge_missing
+        device_class: problem
+        # Both USGS gauges out — NWIS outage or a site off-line for maintenance. One of
+        # the two being available is fine, so this only fires when both are gone.
+        state: >
+          {{ not has_value('sensor.ackerly_creek_modeling_creek_usgs_leggetts_gage')
+             and not has_value('sensor.ackerly_creek_modeling_creek_usgs_tunkhannock_gage') }}
+
 automation:
-  - id: creek_tier0_advisory_placeholder
-    alias: "Creek Tier 0 Advisory (placeholder)"
+  # Tier evaluation itself lives in the add-on (app/tiers.py) and arrives as
+  # sensor.ackerly_creek_modeling_creek_alert_tier. This automation is only the HA-side
+  # *action* half of spec §6. It supersedes the old Tier 0 placeholder, which keyed off a
+  # sensor.nws_qpf_24h REST sensor that Addendum C decided never to build.
+  #
+  # Tier scale: 0 All-clear · 1 Advisory · 2 Watch · 3 Warning · 4 Emergency.
+  #
+  # DELIBERATELY CONSERVATIVE: notifications only. The escalating actions in spec §6
+  # (mobile push, TTS, wake-the-house) are NOT wired up — thresholds are uncalibrated
+  # (open questions #5/#7) and §8 requires every wake-the-family action to be dry-run
+  # testable first. Add notify targets here once a few storms have validated the tiers.
+  - id: creek_tier_change
+    alias: "Creek alert tier changed"
     description: >-
-      PLACEHOLDER per spec §6 Tier 0: forecast risk = QPF >= X" in 24 h AND soil
-      moisture >= Y%. Both thresholds are UNCONFIRMED — the NWS QPF REST sensor is
-      wired in Phase 2, and the soil threshold is pending field calibration
-      (open question #7). Left enabled but effectively inert until sensor.nws_qpf_24h
-      exists; treat as a wiring stub, not a live alert.
+      Posts a persistent notification whenever the add-on's alert tier changes, including
+      the reason that drove it. Tiers 1-2 are forecast/rainfall driven and work without
+      the creek gauge; tiers 3-4 stay dormant until the ESPHome node reports stage.
     triggers:
       - trigger: state
-        entity_id: sensor.creek_soil_moisture_mean
+        entity_id: sensor.ackerly_creek_modeling_creek_alert_tier
     conditions:
-      - condition: numeric_state
-        entity_id: sensor.creek_soil_moisture_mean
-        above: 70                    # PLACEHOLDER Y% — calibrate (open question #7)
-      # QPF gate via has_value guard so this stays silent (no log spam) until the
-      # NWS QPF REST sensor exists in Phase 2. TODO(Phase 2): sensor.nws_qpf_24h.
+      # Ignore startup/unavailable churn and the MQTT LWT flipping the entity.
       - condition: template
         value_template: >
-          {{ has_value('sensor.nws_qpf_24h')
-             and states('sensor.nws_qpf_24h') | float(0) >= 1.0 }}
-                                       # PLACEHOLDER X inches / 24 h
+          {{ trigger.to_state.state not in ['unknown', 'unavailable']
+             and trigger.from_state is not none
+             and trigger.from_state.state not in ['unknown', 'unavailable']
+             and trigger.to_state.state != trigger.from_state.state }}
     actions:
-      - action: persistent_notification.create
-        data:
-          notification_id: creek_tier0_advisory
-          title: "Creek Advisory (Tier 0)"
-          message: >-
-            Elevated flood risk: antecedent soil moisture
-            {{ states('sensor.creek_soil_moisture_mean') }}% with significant forecast
-            rain. (Placeholder thresholds — not yet calibrated.)
+      - choose:
+          # Back to all-clear: replace the notification rather than leaving a stale alarm.
+          - conditions:
+              - condition: state
+                entity_id: sensor.ackerly_creek_modeling_creek_alert_tier
+                state: "0"
+            sequence:
+              - action: persistent_notification.dismiss
+                data:
+                  notification_id: creek_alert_tier
+              - action: persistent_notification.create
+                data:
+                  notification_id: creek_all_clear
+                  title: "Creek all-clear"
+                  message: >-
+                    Conditions back to normal
+                    ({{ now().strftime('%-I:%M %p') }}).
+        default:
+          - action: persistent_notification.dismiss
+            data:
+              notification_id: creek_all_clear
+          - action: persistent_notification.create
+            data:
+              notification_id: creek_alert_tier
+              title: >-
+                Creek {{ state_attr('sensor.ackerly_creek_modeling_creek_alert_tier',
+                                    'label') or 'alert' }}
+                (Tier {{ states('sensor.ackerly_creek_modeling_creek_alert_tier') }})
+              message: >-
+                {{ state_attr('sensor.ackerly_creek_modeling_creek_alert_tier', 'why')
+                   or 'No reason reported.' }}
+
+                _Thresholds are not yet field-calibrated — verify before acting._
     mode: single

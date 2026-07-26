@@ -66,8 +66,9 @@ def _run_inference_once(
     mqtt.publish("flood_probability", {"value": pred.flood_probability, "method": pred.method})
     mqtt.publish("predicted_crest", {"value": pred.predicted_crest_ft})
     mqtt.publish("lag_estimate", {"value": pred.lag_estimate_min})
-    tier, label = compute_tier(pred.flood_probability, row.ponding_flag)
-    mqtt.publish("alert_tier", {"value": tier, "label": label})
+    tier, label, reasons = compute_tier(row, pred.flood_probability)
+    mqtt.publish("alert_tier", {"value": tier, "label": label, "reasons": reasons,
+                                "why": "; ".join(reasons) or "nothing elevated"})
     mqtt.publish("features", {k: getattr(row, k) for k in FEATURE_KEYS})
     dataset.append_row(row)
     status["last_inference_at"] = _now_iso()

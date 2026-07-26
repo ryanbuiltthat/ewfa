@@ -68,8 +68,14 @@ today; the rest fill in through Phase 3/4 as sources come online.
   site-specific — see open question #7; the saturated/dry endpoints need field calibration
   before the ponding threshold and Tier 0 condition are meaningful.
 - **Rainfall** — on-site rate/daily (Ecowitt) and upstream PWS accumulations (1/3/6/24/72 h).
-- **Forecast/model** — QPF (next 6/24 h), NWM reach forecast, Google flood status.
-- **Context** — SNODAS SWE, temperature (rain-on-snow flag), season.
+- **Forecast/model** — NWS QPF (next 6/24 h) and NWM reach forecast (live); Google flood
+  status (not built yet).
+- **Neighbouring gauges** — USGS 01534860 (Lackawanna below Leggetts Ck) and 01534000
+  (Tunkhannock Ck): gage height, discharge and 3 h rise. Different basins with their own lag,
+  so not a stand-in for creek level; they are the
+  observed rainfall→response record used to bootstrap the lag estimate while the creek node
+  is still to be built.
+- **Context** — SNODAS SWE, temperature (rain-on-snow flag), season. (Not built yet.)
 
 ## Persistent storage (`/data`)
 

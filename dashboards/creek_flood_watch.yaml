@@ -12,9 +12,14 @@
 #         filename: dashboards/creek_flood_watch.yaml
 #
 # Stock cards only (gauge / history-graph / entities / markdown / button), styled by the
-# Prism theme. Requires the Layer-2 package (ha-packages/creek_modeling.yaml) for the
-# creek_* MQTT entities and the creek_modeling add-on to be running. Entities that don't
-# exist yet (e.g. sensor.ackerly_creek_modeling_creek_stage before the ESPHome node is live) degrade gracefully.
+# Prism theme. Requires the creek_modeling add-on to be running (it auto-creates its own
+# entities via MQTT discovery) plus ha-packages/creek_warning.yaml for the soil-moisture
+# templates and watchdogs. Entities that don't exist yet (e.g. sensor.creek_stage before
+# the ESPHome node is live) degrade gracefully.
+#
+# ENTITY IDs: add-on entities are MQTT-discovery entities on the "Ackerly Creek Modeling"
+# device, so HA prefixes them -> sensor.ackerly_creek_modeling_creek_*. Entities from the
+# HA package and the ESPHome node are unprefixed -> sensor.creek_*.
 #
 # NOTE: `theme: Prism` assumes that theme is installed under that exact name — adjust or
 # remove the theme keys if yours differs.
@@ -37,13 +42,17 @@ views:
           ({{ states('sensor.ackerly_creek_modeling_creek_model_method') }} model)
 
           {% set tier = states('sensor.ackerly_creek_modeling_creek_alert_tier') %}
-          {% if tier == '3' %}🚨 Flooding imminent or underway — act now.
-          {% elif tier == '2' %}⚠️ Creek is responding to rain — monitor closely.
-          {% elif tier == '1' %}👀 Conditions are setting up — keep an eye on it.
+          {% if tier == '4' %}🚨 Flooding imminent or underway — act now.
+          {% elif tier == '3' %}⚠️ Creek is responding to rain — monitor closely.
+          {% elif tier == '2' %}👀 Rain is falling upstream — conditions are setting up.
+          {% elif tier == '1' %}🌧️ Forecast risk — wet ground with rain coming.
           {% else %}✅ No elevated flood risk right now.
           {% endif %}
 
-          _Placeholder thresholds — not yet field-calibrated (open question #7)._
+          {% set why = state_attr('sensor.ackerly_creek_modeling_creek_alert_tier', 'why') %}
+          {% if tier not in ['0', 'unknown', 'unavailable'] and why %}**Why:** {{ why }}{% endif %}
+
+          _Placeholder thresholds — not yet field-calibrated (open questions #5/#7)._
 
       - type: gauge
         entity: sensor.ackerly_creek_modeling_creek_flood_probability
@@ -60,7 +69,7 @@ views:
         title: Creek Level (24 h)
         hours_to_show: 24
         entities:
-          - entity: sensor.ackerly_creek_modeling_creek_stage
+          - entity: sensor.creek_stage
             name: Stage
 
       - type: entities
@@ -71,9 +80,9 @@ views:
             name: Predicted crest
           - entity: sensor.ackerly_creek_modeling_creek_lag_estimate
             name: Lag estimate
-          - entity: sensor.ackerly_creek_modeling_creek_soil_moisture_mean
+          - entity: sensor.creek_soil_moisture_mean
             name: Soil moisture (mean)
-          - entity: binary_sensor.ackerly_creek_modeling_creek_soil_ponding
+          - entity: binary_sensor.creek_soil_ponding
             name: Low-lying ponding
 
       - type: entities
@@ -111,6 +120,32 @@ views:
             name: NWM forecast flow
           - entity: sensor.ackerly_creek_modeling_creek_nwm_flow_peak
             name: NWM forecast peak
+
+      # Downstream USGS gauges. Different basin and a longer lag than ours, so these are
+      # NOT a proxy for creek level — they are the observed response signal used to
+      # estimate the rainfall->crest lag until the creek node is mounted (spec §1/§7).
+      - type: entities
+        title: Downstream gauges (validation)
+        show_header_toggle: false
+        entities:
+          - entity: sensor.ackerly_creek_modeling_creek_usgs_leggetts_gage
+            name: Lackawanna @ Scranton (Leggetts)
+          - entity: sensor.ackerly_creek_modeling_creek_usgs_leggetts_rise_3h
+            name: ↳ rise (3 h)
+          - type: divider
+          - entity: sensor.ackerly_creek_modeling_creek_usgs_tunkhannock_gage
+            name: Tunkhannock Creek
+          - entity: sensor.ackerly_creek_modeling_creek_usgs_tunkhannock_rise_3h
+            name: ↳ rise (3 h)
+
+      - type: history-graph
+        title: Upstream rain vs downstream response (24 h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ackerly_creek_modeling_creek_upstream_rain_3h
+            name: Upstream rain (3 h)
+          - entity: sensor.ackerly_creek_modeling_creek_usgs_leggetts_gage
+            name: Leggetts gage
 
   # ============================ OPERATOR ==============================
   - title: Operator
@@ -193,7 +228,7 @@ views:
         title: Ingestion health
         show_header_toggle: false
         entities:
-          - entity: sensor.ackerly_creek_modeling_creek_stage
+          - entity: sensor.creek_stage
             name: Creek stage
             secondary_info: last-changed
           - entity: sensor.outside_weather_station_soil_moisture_1
@@ -213,11 +248,22 @@ views:
         title: Watchdogs
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.ackerly_creek_modeling_creek_stage_stale
+          - entity: binary_sensor.creek_stage_stale
             name: Creek stage stale
-          - entity: binary_sensor.ackerly_creek_modeling_creek_soil_moisture_stale
+          - entity: binary_sensor.creek_soil_moisture_stale
             name: Soil moisture stale
-          - entity: binary_sensor.ackerly_creek_modeling_creek_rain_rate_stale
+          - entity: binary_sensor.creek_rain_rate_stale
             name: Rain rate stale
-          - entity: binary_sensor.ackerly_creek_modeling_creek_modeling_service_stale
+          - entity: binary_sensor.creek_modeling_service_stale
             name: Modeling service stale
+          - type: divider
+          # Ingest sources — ON means the source published no value, not that the value
+          # is old (a legitimate 0.00 in never changes state).
+          - entity: binary_sensor.creek_forecast_data_missing
+            name: NWS QPF missing
+          - entity: binary_sensor.creek_upstream_data_missing
+            name: Upstream PWS missing
+          - entity: binary_sensor.creek_nwm_data_missing
+            name: NWM reach missing
+          - entity: binary_sensor.creek_downstream_gauge_missing
+            name: USGS gauges missing

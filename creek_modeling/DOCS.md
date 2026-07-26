@@ -63,7 +63,7 @@ Set these on the **Configuration** tab.
 | `fast_loop_minutes` | `5` | Inference cadence (1–60) |
 | `nightly_retrain_hour` | `3` | Local hour (0–23) for the nightly batch |
 | `mqtt_base_topic` | `creek` | Base MQTT topic |
-| `publish_prefix` | `creek` | Entity prefix, e.g. `sensor.creek_flood_probability` |
+| `publish_prefix` | `creek` | MQTT topic prefix (entity IDs come from discovery, see below) |
 | `min_events_for_ml` | `10` | Stay on the threshold model until ≥ N storms captured |
 | `google_floods_api_key` | `""` | Optional (Google Flood status) |
 | `wu_api_key` | `""` | Optional (Weather Underground PWS) |
@@ -73,16 +73,39 @@ Set these on the **Configuration** tab.
 | `soil_moisture_entities` | WH51 #1, #2 | `..._soil_moisture_1` (near house / willow), `_2` (near creek) |
 | `onsite_rain_rate_entity` | `sensor.weather_station_rain_rate` | Ecowitt |
 | `onsite_rain_daily_entity` | `sensor.weather_station_daily_rain` | Ecowitt |
+| `usgs_downstream` | `true` | Poll USGS 01534860 / 01534000 (free, no key) for lag validation |
 
 ## How it talks to Home Assistant
 
 - **Reads** entity states through the Supervisor proxy at `http://supervisor/core/api`,
   authenticated by the injected `SUPERVISOR_TOKEN` — no long-lived token needed
   (`homeassistant_api: true`).
-- **Writes** `creek/flood_probability`, `creek/predicted_crest`, `creek/lag_estimate`, and
-  `creek/model_health` over MQTT (broker discovered via services). Add matching HA MQTT
-  sensors (see `ha-packages/creek_warning.yaml`) to surface them as entities for the alert
-  automations.
+- **Writes** its outputs, ingested features and status over MQTT (broker discovered via
+  services) and auto-creates the matching HA entities via MQTT discovery — no package edit.
+- **Entity IDs:** the discovered entities belong to an *Ackerly Creek Modeling* device, so
+  Home Assistant prefixes the device name:
+  `sensor.ackerly_creek_modeling_creek_flood_probability`,
+  `sensor.ackerly_creek_modeling_creek_qpf_24h`, and so on. Entities defined in
+  `ha-packages/creek_warning.yaml` (soil-moisture mean, ponding, watchdogs) and the ESPHome
+  creek node are *not* discovery entities and stay unprefixed (`sensor.creek_*`).
+
+## Alert tiers
+
+`app/tiers.py` evaluates spec §6 and publishes `creek/alert_tier` with a numeric level, a
+label, and the reasons that fired:
+
+| Level | Label | Driven by | Needs the creek gauge? |
+|---|---|---|---|
+| 0 | All-clear | nothing elevated | — |
+| 1 | Advisory | NWS QPF + antecedent soil moisture | No |
+| 2 | Watch | upstream / on-site rain accumulation | No |
+| 3 | Warning | stage, rate-of-rise | Yes |
+| 4 | Emergency | stage near bank top | Yes |
+
+Levels 1–2 run entirely off forecast and rainfall data, so the system issues useful
+warnings before the SEN0676 is mounted. Levels 3–4 stay dormant until the ESPHome node
+reports stage. **All thresholds are placeholders** pending the surveyed datum (open
+question #5), WH51 calibration (#7), and observed storms (Phase 3).
 
 ## Persistent storage (`/data`)
 
@@ -94,10 +117,11 @@ Set these on the **Configuration** tab.
 
 ## Status
 
-Phase 2 **skeleton**: validates the Supervisor proxy + MQTT wiring, builds live features
-(stage, rate-of-rise, soil moisture + ponding flag), and returns a transparent conservative
-**threshold** estimate. Gradient-boosting inference and nightly retrain land in Phase 4 behind
-the same interfaces (`app/model.py`).
+Phase 2 (Ingest). Live: on-site rain accumulations, NWS QPF, Weather Underground upstream
+PWS, NWM reach forecast, USGS downstream gauges, and forecast-driven alert tiers. Still
+outstanding for Phase 2: Google Flood Forecasting, SNODAS snow-water-equivalent, NWS active
+alert products, and the Antecedent Precipitation Index. Gradient-boosting inference and
+nightly retrain land in Phase 4 behind the same interfaces (`app/model.py`).
 
 > **Calibration note:** WH51 soil-moisture readings are relative (0–100 %) and site-specific.
 > The saturated/dry endpoints need field calibration (open question #7) before the ponding

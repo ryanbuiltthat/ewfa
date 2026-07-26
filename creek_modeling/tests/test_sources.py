@@ -14,6 +14,7 @@ class _Cfg:
     wu_api_key = ""                  # -> no WU source
     upstream_pws_ids = []
     nwm_reach_id = ""                # -> no NWM source
+    usgs_downstream = False          # -> no USGS source
 
 
 class _HA:

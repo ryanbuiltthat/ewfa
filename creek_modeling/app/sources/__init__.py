@@ -19,6 +19,7 @@ from ..ha import HAClient
 from .nwm import NwmReach
 from .nws import NwsQpf
 from .rain import RainAccumulator
+from .usgs import SITES as USGS_SITES, UsgsDownstream, feature_keys as usgs_feature_keys
 from .wu import WuUpstream
 
 log = logging.getLogger("app.sources")
@@ -32,6 +33,8 @@ FEATURE_KEYS = (
     "upstream_rain_1h_in", "upstream_rain_3h_in", "upstream_rain_6h_in",
     "upstream_rain_24h_in", "upstream_rain_72h_in", "upstream_precip_today_in",
     "nwm_flow_cfs", "nwm_flow_max_cfs",
+    # 2c — USGS downstream gauges
+    *usgs_feature_keys(),
 )
 
 
@@ -56,11 +59,20 @@ class SourceCoordinator:
         else:
             log.info("WU upstream disabled (needs wu_api_key + upstream_pws_ids)")
 
-        if cfg.nwm_reach_id:
-            self._sources.append(NwmReach(cfg.nwm_reach_id))
-            log.info("NWM reach %s enabled", cfg.nwm_reach_id)
+        # `bashio::config` renders an unset optional as the literal string "null", which
+        # would otherwise enable the source and fail every poll against a bogus reach.
+        reach_id = cfg.nwm_reach_id.strip()
+        if reach_id and reach_id != "null":
+            self._sources.append(NwmReach(reach_id))
+            log.info("NWM reach %s enabled", reach_id)
         else:
             log.info("NWM reach disabled (needs nwm_reach_id)")
+
+        if cfg.usgs_downstream:
+            self._sources.append(UsgsDownstream())
+            log.info("USGS downstream gauges enabled: %s", ", ".join(USGS_SITES))
+        else:
+            log.info("USGS downstream gauges disabled")
 
         self._cache: dict[str, float | None] = {}
         self._next_poll: dict[str, float] = {}

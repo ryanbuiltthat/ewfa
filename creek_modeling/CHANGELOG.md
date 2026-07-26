@@ -3,6 +3,43 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.6.0
+
+- **Forecast-driven alert tiers** (spec §6, Addendum C.3): `app/tiers.py` now evaluates the
+  full feature row instead of probability alone, so **Tier 1 Advisory** (NWS QPF onto wet
+  soil) and **Tier 2 Watch** (upstream/on-site rain accumulating) fire *without the creek
+  gauge* — the first genuinely useful warnings the system can issue before the SEN0676 is
+  mounted. Each tier publishes the reasons that fired it (`why` attribute), surfaced on the
+  dashboard and in the notification.
+  - **Breaking (entity semantics):** the tier scale is now `0` All-clear · `1` Advisory ·
+    `2` Watch · `3` Warning · `4` Emergency, matching spec §6 plus an explicit all-clear.
+    Previously `0`–`3` collapsed Advisory into Watch. The dashboard is updated in the same
+    commit; any external automation keyed on the old numbers needs re-checking.
+- **USGS downstream gauges — ingestion slice 2c**: new `app/sources/usgs.py` polls NWIS
+  instantaneous values for 01534860 (Lackawanna River below Leggetts Creek at Scranton) and
+  01534000 (Tunkhannock Creek), reporting gage height, discharge, and 3 h rise for each. Free,
+  no key. Leggetts Creek drains the same Clarks Summit / Chinchilla upland as our upstream
+  half, so that gauge sees roughly our rain. These are a
+  *different, larger* basin — not a creek-level proxy — but they are the only observed
+  rainfall→response signal available before the creek node exists, which gives the Phase-3
+  lag estimate a head start. New `usgs_downstream` option (default on).
+- **Ingest watchdogs**: four new HA-side binary sensors flag a source publishing no value
+  (QPF, upstream PWS, NWM, USGS). They test for a *value*, not staleness — a feature
+  legitimately sitting at 0.00 in never changes state, so a staleness check would false-alarm.
+- **Tier notification automation** replaces the old Tier 0 placeholder, which keyed off a
+  `sensor.nws_qpf_24h` REST sensor that Addendum C decided never to build. Notifications
+  only; escalating/wake-the-house actions stay unwired until thresholds are calibrated.
+- **Fixes:**
+  - Entity IDs in `ha-packages/creek_warning.yaml` and the dashboard now match reality.
+    MQTT-discovery entities carry the device-name prefix (`sensor.ackerly_creek_modeling_creek_*`);
+    HA-package templates and the ESPHome node do not. A previous blanket rename had applied
+    the prefix to seven entities that never had it, and the pipeline-state watchdog was
+    missing the prefix it did need. `discovery.py`'s docstring claimed the old scheme.
+  - `sensor.outside_weather_station_rain_rate` → `sensor.weather_station_rain_rate` in the
+    rain-rate watchdog (missed by the earlier entity-name correction).
+  - An unset `nwm_reach_id` reaches Python as the literal string `"null"` from
+    `bashio::config`; it now disables the source instead of polling a bogus reach.
+
 ## 0.5.0
 
 - **Forecast/upstream ingestion — slice 2b** (spec Addendum C): adds two sources, published

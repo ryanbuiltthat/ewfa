@@ -5,11 +5,15 @@ Publishing retained config messages under
 (and update) the `creek_*` sensors and buttons automatically — no HA package or
 `configuration.yaml` edit for them, and they refresh whenever the add-on updates.
 
-Entity IDs are kept stable (`sensor.creek_flood_probability`, `button.creek_retrain_now`,
-…) via the entity `name` (HA slugifies it to the entity_id when `has_entity_name` is off)
-plus a payload `object_id`, so the dashboard's references keep working. All entities share
-one `device` and an `availability_topic` driven by the MQTT LWT, so they show *unavailable*
-when the add-on is stopped.
+Because every entity carries a `device` block, Home Assistant prefixes the device name
+when it mints the entity_id — the published slug `creek_flood_probability` lands as
+`sensor.ackerly_creek_modeling_creek_flood_probability`. That prefix is what the
+dashboard references; only entities defined here get it. The HA-side template sensors in
+`ha-packages/creek_warning.yaml` (soil mean, ponding, the stale watchdogs) and the
+ESPHome creek node are *not* published here and keep their unprefixed IDs.
+
+All entities share one `device` and an `availability_topic` driven by the MQTT LWT, so
+they show *unavailable* when the add-on is stopped.
 """
 from __future__ import annotations
 
@@ -74,6 +78,11 @@ class DiscoveryPublisher:
                 "state_topic": f"{b}/alert_tier",
                 "value_template": "{{ value_json.value }}",
                 "json_attributes_topic": f"{b}/alert_tier", "icon": "mdi:alert-decagram"}),
+            ("sensor", "creek_tier_reason", {
+                "name": "Creek Tier Reason",
+                "state_topic": f"{b}/alert_tier",
+                "value_template": "{{ value_json.why }}",
+                "icon": "mdi:comment-question-outline"}),
             # --- pipeline status ---
             ("sensor", "creek_pipeline_state", {
                 "name": "Creek Pipeline State",
@@ -171,6 +180,37 @@ class DiscoveryPublisher:
                 "value_template": "{{ value_json.nwm_flow_max_cfs if value_json.nwm_flow_max_cfs is not none else none }}",
                 "unit_of_measurement": "ft³/s", "state_class": "measurement",
                 "icon": "mdi:waves-arrow-up"}),
+            # --- ingested features (Addendum C 2c): USGS downstream gauges ---
+            *(
+                spec
+                for site, label, pretty in (
+                    ("01534860", "leggetts", "Leggetts"),
+                    ("01534000", "tunkhannock", "Tunkhannock"),
+                )
+                for spec in (
+                    ("sensor", f"creek_usgs_{label}_gage", {
+                        "name": f"Creek USGS {pretty} Gage Height",
+                        "state_topic": f"{b}/features",
+                        "value_template": (f"{{{{ value_json.usgs_{label}_gage_ft "
+                                           f"if value_json.usgs_{label}_gage_ft is not none else none }}}}"),
+                        "unit_of_measurement": "ft", "state_class": "measurement",
+                        "icon": "mdi:altimeter"}),
+                    ("sensor", f"creek_usgs_{label}_flow", {
+                        "name": f"Creek USGS {pretty} Flow",
+                        "state_topic": f"{b}/features",
+                        "value_template": (f"{{{{ value_json.usgs_{label}_flow_cfs "
+                                           f"if value_json.usgs_{label}_flow_cfs is not none else none }}}}"),
+                        "unit_of_measurement": "ft³/s", "state_class": "measurement",
+                        "icon": "mdi:waves"}),
+                    ("sensor", f"creek_usgs_{label}_rise_3h", {
+                        "name": f"Creek USGS {pretty} Rise 3h",
+                        "state_topic": f"{b}/features",
+                        "value_template": (f"{{{{ value_json.usgs_{label}_rise_3h_ft "
+                                           f"if value_json.usgs_{label}_rise_3h_ft is not none else none }}}}"),
+                        "unit_of_measurement": "ft", "state_class": "measurement",
+                        "icon": "mdi:trending-up"}),
+                )
+            ),
             # --- command buttons ---
             ("button", "creek_run_inference_now", {
                 "name": "Creek Run Inference Now",

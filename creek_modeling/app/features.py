@@ -1,9 +1,10 @@
 """Feature builders.
 
-Phase 2 computes the cheap live features the threshold-based alerting needs
-(current stage, rate-of-rise, soil moisture). The richer feature set from spec
-§5 (multi-window rain accumulations, API, QPF, NWM, SNODAS SWE, rain-on-snow)
-lands in Phase 3/4 and appends to the same feature rows.
+Builds the live feature row each fast loop: the cheap local features computed here
+(stage, rate-of-rise, soil moisture, ponding) plus everything the SourceCoordinator
+ingests (rain accumulations, QPF, upstream PWS, NWM reach, USGS downstream gauges).
+Still outstanding from spec §5: the Antecedent Precipitation Index, SNODAS SWE and the
+rain-on-snow flag, and Google flood status.
 """
 from __future__ import annotations
 
@@ -42,6 +43,14 @@ class FeatureRow:
     upstream_precip_today_in: float | None = None
     nwm_flow_cfs: float | None = None
     nwm_flow_max_cfs: float | None = None
+    # USGS downstream gauges — no gauge of our own yet, so these carry the only
+    # observed rainfall->response signal available (spec §1, slice 2c).
+    usgs_leggetts_gage_ft: float | None = None
+    usgs_leggetts_flow_cfs: float | None = None
+    usgs_leggetts_rise_3h_ft: float | None = None
+    usgs_tunkhannock_gage_ft: float | None = None
+    usgs_tunkhannock_flow_cfs: float | None = None
+    usgs_tunkhannock_rise_3h_ft: float | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)

@@ -10,7 +10,12 @@
 
 - Ackerly Creek: ~8.7 mi long, ~18 mi² basin, flows NW from headwaters swamp in South Abington Twp through Waverly, Glenburn, Dalton, joining South Branch Tunkhannock Creek at La Plume.
 - Sensor site is mid-watershed; upstream drainage (~half the basin) lies SE toward Chinchilla / Clarks Summit / South Abington.
-- **No official gauge exists on Ackerly Creek.** USGS 01533960 (East Benton) and 01533970 (Dalton) are water-quality sites only. Active continuous gauges — USGS 01533990 (SB Tunkhannock at Bardwell), USGS 01534000 (Tunkhannock Creek nr Tunkhannock), SRBC CIM at La Plume — are all *downstream*; useful for validation only.
+- **No official gauge exists on Ackerly Creek.** USGS 01533960 (East Benton) and 01533970 (Dalton) are water-quality sites only. ~~USGS 01533990 (SB Tunkhannock at Bardwell)~~ **does not exist** — NWIS returns "no sites found" for that number; it was a bad ID, not a retired gauge. The nearest gauges that actually publish continuous instantaneous values are:
+  - **USGS 01534860** — Lackawanna River below Leggetts Creek at Scranton (~7 mi SE). Adjacent basin, but Leggetts Creek drains the same Clarks Summit / Chinchilla / South Abington upland that forms Ackerly's upstream half, so it sees substantially the same rain. Best available response analog.
+  - **USGS 01534000** — Tunkhannock Creek nr Tunkhannock (~11 mi W). The receiving system downstream of the confluence; much larger drainage, longer lag.
+  - SRBC CIM at La Plume — downstream.
+
+  All are off-basin or downstream: useful for validation and for empirically estimating the rainfall→response lag, never as a stand-in for creek stage.
 - Flashy small basin: expected rainfall-to-crest lag is likely tens of minutes to a few hours. This lag is the warning window; empirically measuring it is a core project outcome.
 - Regional hazard note: NEPA rain-on-snow events are a major flood driver; snowpack state must be a model input (via SNODAS data, no hardware).
 
@@ -121,8 +126,8 @@ Pressure-transducer redundancy + divergence alarm; creek camera; HACS integratio
 
 1. ~~HA install type on mini PC (HAOS/Supervised → add-on path; Container → sidecar docker-compose path).~~ **RESOLVED: HA install is HAOS.** Layer 2 modeling service is built as a local add-on — see [Addendum A](#addendum-a--modeling-service-as-a-haos-add-on-resolves-open-question-1).
 2. Google Floods API: does a virtual gauge (hybas) land on Ackerly Creek or nearest SB Tunkhannock reach? What are its thresholds?
-3. NWM reach ID for the Ackerly segment at 41.5237,-75.7304.
-4. Which 3–5 upstream PWS stations are reliable (uptime, tipping-bucket quality)?
+3. ~~NWM reach ID for the Ackerly segment at 41.5237,-75.7304.~~ **RESOLVED** — set in the add-on's `nwm_reach_id` option.
+4. ~~Which 3–5 upstream PWS stations are reliable (uptime, tipping-bucket quality)?~~ **RESOLVED** — stations selected and set in `upstream_pws_ids`.
 5. Exact low-water reference datum and surveyed bank height at the sensor site (measure at install).
 6. WiFi RSSI at the pole via the outdoor AP (bag test before final mount).
 7. WH51 readings are relative (0–100%) and site-specific. After the next soaking rain and a dry stretch, record the empirical "saturated" and "dry" values at each burial spot; these calibrate the Tier 0 soil-moisture threshold.
@@ -418,9 +423,25 @@ read once from HA `/api/config` — no new option.
 - **2b — upstream + model (done):** `wu.py` (Weather Underground PWS upstream accumulations
   via the shared accumulator, `wu_api_key` + `upstream_pws_ids`) and `nwm.py` (NWPS reach
   short-range streamflow forecast — near-term + peak discharge, `nwm_reach_id`).
+- **2c — downstream observations (done):** `usgs.py` (NWIS instantaneous values for the two
+  downstream gauges named in §1 — gage height, discharge, and 3 h rise each; free, no key).
+  A larger basin with a longer lag, so *not* a creek-level proxy; its value is being the only
+  **observed** rainfall→response record available before the creek node exists, which lets the
+  Phase-3 lag/response work start against real hydrographs instead of waiting on hardware.
+
+Still to build for Phase 2: Google Flood Forecasting (`gauges:searchGaugesByArea`, §3),
+SNODAS snow-water-equivalent (rain-on-snow, §1), NWS active alert products (the Flood Warning
+force-promote in §6), and the Antecedent Precipitation Index (§5).
 
 ### C.3 Consumption
 
-2a records + publishes the features (dataset growth + dashboard visibility). Wiring them into
-the tier logic (a real Tier 0 Advisory from QPF + soil, Tier 1 Watch from upstream rain) and
-into the model is a subsequent step, behind the same interfaces.
+Ingested features are recorded to the dataset, published on `creek/features`, and — as of
+slice 2c — consumed by the tier logic. `app/tiers.py` evaluates §6 against the whole feature
+row and emits `0` All-clear · `1` Advisory · `2` Watch · `3` Warning · `4` Emergency (the §6
+table plus the explicit all-clear state §6 also calls for), with the reasons that fired.
+
+The design point: **Advisory and Watch are gauge-independent.** Advisory comes from QPF plus
+antecedent soil moisture, Watch from upstream/on-site rain accumulation — both already
+flowing. So the system issues real warnings during the wait for the SEN0676, while Warning
+and Emergency (stage, rate-of-rise) stay dormant until the creek node reports. Feeding these
+features into the *model* remains Phase 4, behind the same interfaces.
