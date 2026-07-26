@@ -31,6 +31,8 @@ FEATURE_KEYS = (
     # 2a — on-site rain + NWS QPF
     "rain_1h_in", "rain_3h_in", "rain_6h_in", "rain_24h_in", "rain_72h_in",
     "qpf_6h_in", "qpf_24h_in",
+    # 2f — antecedent precipitation index (rides on the on-site rain samples)
+    "api_index_in",
     # 2b — upstream WU + NWM reach
     "upstream_rain_1h_in", "upstream_rain_3h_in", "upstream_rain_6h_in",
     "upstream_rain_24h_in", "upstream_rain_72h_in", "upstream_precip_today_in",

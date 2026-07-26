@@ -102,6 +102,11 @@ views:
             name: Forecast rain (next 6 h)
           - entity: sensor.ackerly_creek_modeling_creek_qpf_24h
             name: Forecast rain (next 24 h)
+          - type: divider
+          # Basin-wide antecedent wetness — weeks of rainfall history in one number.
+          # High API means the next storm runs off instead of soaking in.
+          - entity: sensor.ackerly_creek_modeling_creek_api_index
+            name: Antecedent precipitation index
 
       # Snowpack. Rain-on-snow is a major NEPA flood driver (spec §1) — the pack melts
       # into the same storm, so runoff exceeds what the rainfall alone suggests.

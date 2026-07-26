@@ -3,6 +3,24 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.9.0
+
+- **Antecedent Precipitation Index — ingestion slice 2f** (spec §4/§5): `api_index_in`, an
+  exponentially-decaying rainfall memory. It complements the WH51 probes rather than
+  duplicating them — those read two buried points, this summarises weeks of rainfall over
+  the whole basin, and wet antecedent conditions are what turn an ordinary storm into a
+  flood. Needs no creek gauge.
+  - Decay is applied as a continuous power of elapsed time, not a discrete daily step, so
+    an irregular sampling interval or a restart decays correctly.
+  - State is persisted with its timestamp, so downtime decays the index instead of freezing
+    it. A gap beyond 14 days restarts from zero rather than carrying a stale value across
+    rainfall that was never sampled — being wrong in the direction of *understating*
+    wetness is the dangerous one, so it is made explicit rather than silent.
+  - Rides on the existing on-site rain samples (the accumulator now exposes its per-update
+    increment), so the rain-rate entity is still read once per loop.
+- **Tier**: the index gives a second route to Advisory alongside soil moisture — high QPF
+  onto a wet basin — so a failed WH51 probe cannot mask saturated ground.
+
 ## 0.8.0
 
 - **SNODAS snowpack — ingestion slice 2e** (spec §1/§5): `app/sources/snodas.py` reports

@@ -140,6 +140,12 @@ class DiscoveryPublisher:
                     "state_class": "measurement", "icon": "mdi:weather-pouring"})
                 for w in (1, 3, 6, 24, 72)
             ),
+            ("sensor", "creek_api_index", {
+                "name": "Creek Antecedent Precipitation Index",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.api_index_in if value_json.api_index_in is not none else none }}",
+                "unit_of_measurement": "in", "state_class": "measurement",
+                "icon": "mdi:water-percent"}),
             ("sensor", "creek_qpf_6h", {
                 "name": "Creek QPF 6h",
                 "state_topic": f"{b}/features",

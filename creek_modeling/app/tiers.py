@@ -45,6 +45,10 @@ TIER_LABELS = {
 ADVISORY_QPF_24H_IN = 1.0
 ADVISORY_SOIL_PCT = 70.0
 ADVISORY_QPF_6H_IN = 0.75          # heavy short-fuse rain earns an advisory on its own
+# Basin-wide antecedent wetness, as an alternative to the two buried WH51 probes: the
+# probes measure two points, the index summarises weeks of rainfall over the whole basin.
+# Either route can raise the advisory, so a failed probe cannot mask a saturated basin.
+ADVISORY_API_INDEX_IN = 2.0
 
 # --- Rain-on-snow: rain actually falling (rather than forecast) onto a pack ---
 ROS_WATCH_RAIN_1H_IN = 0.05
@@ -90,6 +94,9 @@ def compute_tier(row: FeatureRow, flood_probability: float | None) -> tuple[int,
     if _ge(row.qpf_24h_in, ADVISORY_QPF_24H_IN) and _ge(row.soil_moisture_mean_pct, ADVISORY_SOIL_PCT):
         reasons.append((1, f"{row.qpf_24h_in:.2f}\" forecast in 24 h onto "
                            f"{row.soil_moisture_mean_pct:.0f}% soil moisture"))
+    if _ge(row.qpf_24h_in, ADVISORY_QPF_24H_IN) and _ge(row.api_index_in, ADVISORY_API_INDEX_IN):
+        reasons.append((1, f"{row.qpf_24h_in:.2f}\" forecast in 24 h onto a wet basin "
+                           f"(API {row.api_index_in:.2f}\")"))
     if _ge(row.qpf_6h_in, ADVISORY_QPF_6H_IN):
         reasons.append((1, f"{row.qpf_6h_in:.2f}\" forecast in the next 6 h"))
     if row.ponding_flag:

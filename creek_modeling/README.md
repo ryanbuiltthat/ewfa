@@ -67,7 +67,8 @@ today; the rest fill in through Phase 3/4 as sources come online.
   a mean and a `ponding_flag`. **Note:** WH51 readings are relative (0–100%) and
   site-specific — see open question #7; the saturated/dry endpoints need field calibration
   before the ponding threshold and Tier 0 condition are meaningful.
-- **Rainfall** — on-site rate/daily (Ecowitt) and upstream PWS accumulations (1/3/6/24/72 h).
+- **Rainfall** — on-site rate/daily (Ecowitt) and upstream PWS accumulations (1/3/6/24/72 h),
+  plus an Antecedent Precipitation Index summarising weeks of rainfall as one wetness number.
 - **Forecast/model** — NWS QPF (next 6/24 h) and NWM reach forecast (live); Google flood
   status (not built yet).
 - **Neighbouring gauges** — USGS 01534860 (Lackawanna below Leggetts Ck) and 01534000
@@ -75,7 +76,8 @@ today; the rest fill in through Phase 3/4 as sources come online.
   so not a stand-in for creek level; they are the
   observed rainfall→response record used to bootstrap the lag estimate while the creek node
   is still to be built.
-- **Context** — SNODAS SWE, temperature (rain-on-snow flag), season. (Not built yet.)
+- **Context** — SNODAS snow water equivalent and temperature, combined into a rain-on-snow
+  flag; active NWS Flood Watch/Warning products, which floor the alert tier.
 
 ## Persistent storage (`/data`)
 

@@ -123,10 +123,11 @@ question #5), WH51 calibration (#7), and observed storms (Phase 3).
 
 ## Status
 
-Phase 2 (Ingest). Live: on-site rain accumulations, NWS QPF, NWS active alert products,
-Weather Underground upstream PWS, NWM reach forecast, USGS gauges, SNODAS snowpack with a
-rain-on-snow flag, and forecast-driven alert tiers. Still outstanding for Phase 2: Google
-Flood Forecasting and the Antecedent Precipitation Index. Gradient-boosting inference and
+Phase 2 (Ingest) — complete except for Google Flood Forecasting, which is waiting on API
+access. Live: on-site rain accumulations, the Antecedent Precipitation Index, NWS QPF, NWS
+active alert products, Weather Underground upstream PWS, NWM reach forecast, USGS gauges,
+SNODAS snowpack with a rain-on-snow flag, forecast-driven alert tiers, and watchdogs on
+every ingest source. Gradient-boosting inference and
 nightly retrain land in Phase 4 behind the same interfaces (`app/model.py`).
 
 > **Calibration note:** WH51 soil-moisture readings are relative (0–100 %) and site-specific.

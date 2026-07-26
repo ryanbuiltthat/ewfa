@@ -2,9 +2,10 @@
 
 Builds the live feature row each fast loop: the cheap local features computed here
 (stage, rate-of-rise, soil moisture, ponding) plus everything the SourceCoordinator
-ingests (rain accumulations, QPF, upstream PWS, NWM reach, USGS downstream gauges).
-Still outstanding from spec §5: the Antecedent Precipitation Index, SNODAS SWE and the
-rain-on-snow flag, and Google flood status.
+ingests (rain accumulations, the antecedent precipitation index, QPF, NWS alerts, upstream
+PWS, NWM reach, USGS gauges, SNODAS snowpack). Cross-source features that belong to no
+single source — temperature normalisation and the rain-on-snow flag — are derived here.
+Still outstanding from spec §5: Google flood status.
 """
 from __future__ import annotations
 
@@ -35,6 +36,7 @@ class FeatureRow:
     rain_72h_in: float | None = None
     qpf_6h_in: float | None = None
     qpf_24h_in: float | None = None
+    api_index_in: float | None = None   # antecedent wetness, basin-wide (spec §4/§5)
     upstream_rain_1h_in: float | None = None
     upstream_rain_3h_in: float | None = None
     upstream_rain_6h_in: float | None = None

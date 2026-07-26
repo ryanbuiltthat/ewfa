@@ -1,9 +1,12 @@
-"""On-site rain accumulator.
+"""On-site rain accumulator + Antecedent Precipitation Index.
 
 Home Assistant exposes an Ecowitt *rain rate* (in/hr or mm/hr) but no rolling
 multi-window totals. This samples the rate each fast loop and feeds it (normalized to
 inches/hour) into a shared RollingAccumulator, reporting `rain_{1,3,6,24,72}h_in`
 (spec §5). Cold start: totals build up over the first 72 h.
+
+The same rate samples drive the Antecedent Precipitation Index (`api_index_in`), so the
+entity is read once per loop rather than twice.
 """
 from __future__ import annotations
 
@@ -12,6 +15,7 @@ import time
 from pathlib import Path
 
 from .accumulator import RollingAccumulator
+from .apindex import PrecipIndex
 
 log = logging.getLogger("app.sources.rain")
 
@@ -26,6 +30,9 @@ class RainAccumulator:
         self._entity = rate_entity
         self._ha = ha
         self._acc = RollingAccumulator(data_dir / "state" / "rain_accum.json", now_fn)
+        # The API rides on the same rate samples, so it lives here rather than polling
+        # the entity a second time (spec §4/§5).
+        self._api = PrecipIndex(data_dir / "state" / "api_index.json", now_fn=now_fn)
         self._in_per_unit: float | None = None
 
     def _unit_factor(self) -> float:
@@ -39,4 +46,6 @@ class RainAccumulator:
         rate = self._ha.get_float(self._entity)   # per hour, in the entity's unit
         rate_in = rate * self._unit_factor() if rate is not None else None
         sums = self._acc.update(rate_in)
-        return {f"rain_{w}h_in": v for w, v in sums.items()}
+        out = {f"rain_{w}h_in": v for w, v in sums.items()}
+        out["api_index_in"] = self._api.update(self._acc.last_increment)
+        return out

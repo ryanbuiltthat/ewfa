@@ -30,6 +30,8 @@ class RollingAccumulator:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._increments: list[list[float]] = self._load()
         self._last_ts: float | None = None   # not persisted -> no gap-integration on restart
+        # Rain integrated by the most recent update() call; consumed by the API index.
+        self.last_increment: float = 0.0
 
     def _load(self) -> list[list[float]]:
         try:
@@ -47,12 +49,14 @@ class RollingAccumulator:
     def update(self, rate_in_per_hr: float | None) -> dict[int, float]:
         """Integrate the latest rate sample and return {window_hours: inches}."""
         now = self._now()
+        self.last_increment = 0.0
         if rate_in_per_hr is not None and self._last_ts is not None:
             dt_s = now - self._last_ts
             if 0 < dt_s <= self._max_gap:
                 inches = max(0.0, rate_in_per_hr) * (dt_s / 3600.0)
                 if inches > 0:
                     self._increments.append([now, inches])
+                    self.last_increment = inches
         self._last_ts = now
 
         cutoff = now - self._retain
