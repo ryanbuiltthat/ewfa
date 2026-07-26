@@ -35,6 +35,8 @@ creek-flood-warning-spec.md   Source-of-truth project specification
 
 Actively being built in phases: instrument → ingest → collect & correlate → predict → harden. See [creek-flood-warning-spec.md](./creek-flood-warning-spec.md) for the full spec and [docs/open-questions.md](./docs/open-questions.md) for items still being resolved.
 
+When a storm is coming, [docs/storm-runbook.md](./docs/storm-runbook.md) is the checklist — what to check, what to write down while it's happening, and how to annotate the event afterward.
+
 ## Disclaimer
 
 This is a personal, best-effort early-warning aid, not a substitute for official NWS/NOAA flood warnings. Do not rely on it as your sole source of flood safety information.
