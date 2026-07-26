@@ -3,6 +3,24 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.7.0
+
+- **NWS active alert products — ingestion slice 2d** (spec §3): `app/sources/alerts.py`
+  polls `api.weather.gov/alerts/active?point=` (free, no key, 5 min) and reports flags for
+  an active Flood Watch, Flood Warning, and Flash Flood Warning covering the site, plus a
+  total active-product count. Querying by point rather than county zone means only alerts
+  whose polygon actually covers us count.
+- **Tier force-promotion** (spec §6): an active product now imposes a *floor* on the alert
+  tier regardless of what our own instruments show — Flood Watch → ≥ Advisory, Flood
+  Warning → ≥ Watch (the rule §6 mandates), Flash Flood Warning → ≥ Warning. A floor never
+  lowers a tier the sensors have already earned. The Watch and Flash Flood floors go beyond
+  the letter of §6 and are marked as such in `tiers.py`: a Flood Watch *is* the forecast-risk
+  case Advisory describes, and in a basin with a tens-of-minutes response (§1) a flash flood
+  warning is materially more urgent than an areal one.
+- Adds a `Creek NWS Alerts Missing` watchdog. The feed reports "no alerts" as 0 rather than
+  null, so an unavailable count means the call itself is failing — and a Flood Warning could
+  be in effect without us escalating.
+
 ## 0.6.0
 
 - **Forecast-driven alert tiers** (spec §6, Addendum C.3): `app/tiers.py` now evaluates the
