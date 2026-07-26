@@ -18,10 +18,20 @@ present and left null otherwise.
 from __future__ import annotations
 
 import logging
+import shutil
 import sqlite3
 from pathlib import Path
 
 log = logging.getLogger("app.storms")
+
+# Where the log lives under /share. Namespaced so the add-on owns a directory rather
+# than dropping a bare events.sqlite into a volume other add-ons share.
+SHARE_SUBDIR = "creek_modeling"
+
+# A human editing the DB by hand is now an expected concurrent writer, not an anomaly.
+# The fast loop's writes are sub-millisecond, so any collision clears almost immediately
+# — but the CLI's default is to fail instantly with "database is locked" rather than wait.
+BUSY_TIMEOUT_MS = 5000
 
 # PLACEHOLDER thresholds — a small flashy basin (§1), tune once storms are on record.
 START_RAIN_1H_IN = 0.10        # on-site or upstream: rain is meaningfully falling
@@ -54,17 +64,61 @@ _SCHEMA = {
 }
 
 
+def _resolve_db_path(data_dir: Path, share_dir: Path | None) -> Path:
+    """Prefer /share so the file is reachable by hand; fall back to /data.
+
+    The fallback is not decoration: `share:rw` can be dropped from the add-on's config,
+    and outside Supervisor (local dev, the test suite) there is no /share at all. Losing
+    the convenient path is acceptable; failing to record storms is not.
+
+    An existing /data log is *moved*, never copied — a copy would leave the service
+    writing one file while a human annotates another, and the annotations are the whole
+    point of the log.
+    """
+    legacy = data_dir / "events.sqlite"
+    if share_dir is None:
+        return legacy
+
+    target_dir = share_dir / SHARE_SUBDIR
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        probe = target_dir / ".write-test"
+        probe.touch()
+        probe.unlink()
+    except OSError as exc:
+        log.warning("%s not writable (%s) — storm log stays at %s", target_dir, exc, legacy)
+        return legacy
+
+    target = target_dir / "events.sqlite"
+    if not target.exists() and legacy.exists():
+        try:
+            shutil.move(str(legacy), str(target))
+            log.info("Migrated storm event log %s -> %s", legacy, target)
+        except OSError as exc:
+            log.warning("Could not migrate %s (%s) — staying put", legacy, exc)
+            return legacy
+    return target
+
+
 class StormLog:
     """Detects storm events from the feature stream and records them in SQLite."""
 
-    def __init__(self, data_dir: Path):
-        self._path = data_dir / "events.sqlite"
+    def __init__(self, data_dir: Path, share_dir: Path | None = None):
+        self._path = _resolve_db_path(data_dir, share_dir)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
         self._last_rain_ts: float | None = None   # last sample with meaningful rain
+        log.info("Storm event log at %s", self._path)
+
+    @property
+    def path(self) -> Path:
+        """Where the log actually landed — logged at startup and quoted in the docs, so
+        the annotate command can name one real path instead of a guess."""
+        return self._path
 
     def _connect(self) -> sqlite3.Connection:
-        con = sqlite3.connect(self._path)
+        con = sqlite3.connect(self._path, timeout=BUSY_TIMEOUT_MS / 1000)
+        con.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
         con.row_factory = sqlite3.Row
         return con
 

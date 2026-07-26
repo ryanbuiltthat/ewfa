@@ -82,10 +82,14 @@ today; the rest fill in through Phase 3/4 as sources come online.
 ## Persistent storage (`/data`)
 
 ```text
-/data/datasets/dataset.parquet   nightly-appended feature/label rows
-/data/events.sqlite              annotated storm event log
-/data/models/registry.json       versioned artifacts + skill metrics
+/data/datasets/dataset.parquet        nightly-appended feature/label rows
+/data/models/registry.json            versioned artifacts + skill metrics
+/share/creek_modeling/events.sqlite   annotated storm event log
 ```
+
+The storm log sits in `/share`, not the add-on's private `/data`, because it is meant to be
+hand-annotated after each storm — `/share` is the one path that resolves the same way from
+the SSH/Terminal add-on and over Samba. See [DOCS.md](./DOCS.md#persistent-storage).
 
 ## Status
 

@@ -116,22 +116,41 @@ warnings before the SEN0676 is mounted. Levels 3–4 stay dormant until the ESPH
 reports stage. **All thresholds are placeholders** pending the surveyed datum (open
 question #5), WH51 calibration (#7), and observed storms (Phase 3).
 
-## Persistent storage (`/data`)
+## Persistent storage
 
 ```text
-/data/datasets/parts/*.jsonl     today's rows, appended each fast loop
-/data/datasets/dataset.parquet   consolidated nightly from completed parts
-/data/events.sqlite              annotated storm event log
-/data/models/registry.json       versioned artifacts + skill metrics
-/data/state/*.json               rain/API/SNODAS accumulator state
+/data/datasets/parts/*.jsonl          today's rows, appended each fast loop
+/data/datasets/dataset.parquet        consolidated nightly from completed parts
+/data/models/registry.json            versioned artifacts + skill metrics
+/data/state/*.json                    rain/API/SNODAS accumulator state
+/share/creek_modeling/events.sqlite   annotated storm event log
 ```
 
-Annotating a storm (the "annotated" half of the Phase 3 event log) is a SQLite update:
+`/data` is private to this add-on. The storm log is the exception and lives in `/share`,
+because it is the one file a human is expected to edit: `/data` inside the SSH/Terminal
+add-on is *that* add-on's own `/data`, so a `sqlite3 /data/events.sqlite` typed there
+would silently create and edit an empty database. `/share` is one path that means the same
+thing from every add-on, and it is exported over Samba. An events.sqlite left in `/data`
+by an earlier version is moved across automatically on first start; if `/share` is
+unavailable the add-on logs a warning and keeps using `/data`. The resolved path is logged
+at startup — `Storm event log at …`.
+
+Annotating a storm (the "annotated" half of the Phase 3 event log) is a SQLite update.
+The `sqlite3` CLI is installed in this add-on's image, but you do not need it — run this
+from the **SSH & Web Terminal** add-on, or open the file over Samba with any SQLite
+browser:
 
 ```sh
-sqlite3 /data/events.sqlite \
+sqlite3 /share/creek_modeling/events.sqlite \
+  "SELECT id, datetime(started_ts,'unixepoch','localtime'), ended_ts
+     FROM storm_events ORDER BY id DESC LIMIT 5;"
+
+sqlite3 /share/creek_modeling/events.sqlite \
   "UPDATE storm_events SET notes='basement dry; culvert ran full' WHERE id=3;"
 ```
+
+Editing while the service is running is fine — both sides use a 5 s busy timeout, and the
+fast loop's writes are sub-millisecond.
 
 ## Status
 

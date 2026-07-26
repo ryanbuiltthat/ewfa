@@ -316,8 +316,10 @@ else
 fi
 
 # --- Persistent storage (survives add-on updates/restarts) ---
-export DATA_DIR="/data"          # dataset.parquet, events.sqlite, model registry
+export DATA_DIR="/data"          # dataset.parquet, model registry, accumulator state
 mkdir -p "${DATA_DIR}/models" "${DATA_DIR}/datasets"
+export SHARE_DIR="/share"        # events.sqlite — hand-annotated, so not add-on-private
+mkdir -p "${SHARE_DIR}/creek_modeling"
 
 bashio::log.info "Starting Ackerly Creek modeling service (fast loop ${FAST_LOOP_MINUTES}m)…"
 exec python3 -m app
@@ -350,13 +352,26 @@ Supervisor bind-mounts a per-add-on volume at `/data` that persists across resta
 ├── options.json                 # (managed by Supervisor)
 ├── datasets/
 │   └── dataset.parquet          # nightly-appended feature/label rows (§4 batch)
-├── events.sqlite                # annotated storm event log (§7 Phase 3)
 ├── models/
 │   ├── registry.json            # versioned artifacts + skill metrics (hit rate, FA, lead time)
 │   └── model-<version>.pkl      # promoted artifacts (§4 post-storm promotion)
 └── state/
     └── last_run.json            # fast-loop / nightly-batch bookkeeping
 ```
+
+The storm event log is the one exception, and lives in the shared volume instead:
+
+```text
+/share/creek_modeling/events.sqlite   # annotated storm event log (§7 Phase 3)
+```
+
+`/data` is private to each add-on, which makes it the wrong home for the only file the
+project expects a *human* to edit: the documented `sqlite3 /data/events.sqlite` typed in
+the SSH/Terminal add-on opens that add-on's own empty `/data`, succeeding while annotating
+nothing. `/share` resolves identically from every add-on and is exported over Samba, so one
+path works from a terminal or a GUI SQLite browser. A log left in `/data` by an earlier
+version is migrated on first start, and `/data` remains the fallback if `/share` is
+unavailable.
 
 This satisfies §4's "append day's data to dataset (Parquet/SQLite), version model artifact" and §7's storm event log without any external volume.
 

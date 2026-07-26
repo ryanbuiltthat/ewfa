@@ -15,6 +15,11 @@ from pathlib import Path
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 _OPTIONS_JSON = DATA_DIR / "options.json"
 
+# Add-on-private storage is /data; /share is the cross-add-on volume (also exported by
+# Samba). Only the storm event log lives there — see the comment in run.sh. Unset outside
+# Supervisor (local dev), in which case the storm log falls back to DATA_DIR.
+SHARE_DIR = Path(os.environ["SHARE_DIR"]) if os.environ.get("SHARE_DIR") else None
+
 # HA log levels -> Python logging; keep bashio's vocabulary usable here.
 _LEVELS = {
     "trace": logging.DEBUG,

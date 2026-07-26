@@ -3,6 +3,27 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.4
+
+- **Storm annotation actually works now.** Two separate defects made the documented
+  Phase 3 step a no-op, and neither announced itself:
+  - The `sqlite3` **CLI** was never installed in the image — only the Python module, which
+    shares the name and made the omission easy to miss. `sqlite3 …` inside the add-on
+    container was "command not found". Now installed.
+  - Worse, `/data` is **private to each add-on**. Running the documented
+    `sqlite3 /data/events.sqlite` in the SSH/Terminal add-on opens *that* add-on's `/data`,
+    creating an empty database and annotating it happily — no error, and storms could go
+    un-annotated for months before anyone noticed. The storm log now lives at
+    **`/share/creek_modeling/events.sqlite`**, one path that resolves the same way from
+    every add-on and over Samba.
+- **Existing logs migrate automatically** on first start (moved, not copied — a copy would
+  leave the service writing one file while a human annotates another). If `/share` is
+  unavailable the add-on warns and keeps using `/data` rather than failing to record
+  storms. The resolved path is logged at startup as `Storm event log at …`.
+- **5 s busy timeout** on the event log. A person editing by hand is now an expected
+  concurrent writer, and SQLite's default is to fail instantly on a locked database rather
+  than wait out a write that takes under a millisecond.
+
 ## 0.11.3
 
 - **Prime the dashboard at startup.** `model_health` and the lag estimate were published

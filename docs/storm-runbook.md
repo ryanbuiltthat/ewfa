@@ -42,17 +42,20 @@ Time-stamped phone photos count as all of the above.
 
 Storm events don't close until 6 h of quiet, so do this the following day.
 
-- [ ] Find the event and annotate it (the manual half of Phase 3):
+- [ ] Find the event and annotate it (the manual half of Phase 3). From the **SSH & Web
+      Terminal** add-on — no `docker exec`, no protection-mode toggle:
 
 ```sh
-sqlite3 /data/events.sqlite \
+sqlite3 /share/creek_modeling/events.sqlite \
   "SELECT id, datetime(started_ts,'unixepoch','localtime') AS started, ended_ts
      FROM storm_events ORDER BY id DESC LIMIT 5;"
 
-sqlite3 /data/events.sqlite \
+sqlite3 /share/creek_modeling/events.sqlite \
   "UPDATE storm_events SET notes='crest ~40min after upstream peak; culvert full; basement dry'
      WHERE id=3;"
 ```
+
+Same path over Samba if you'd rather use a GUI SQLite browser: `\\<ha-host>\share\creek_modeling\`.
 
 Put the times from *During* in the notes. That's what calibrates the lag.
 
@@ -74,7 +77,7 @@ Put the times from *During* in the notes. That's what calibrates the lag.
 | | |
 |---|---|
 | Storm detection | opens at 0.10 in/h rain (on-site or upstream), closes after 6 h quiet |
-| Event log | peaks + onset conditions written to `/data/events.sqlite`, survives restarts |
+| Event log | peaks + onset conditions written to `/share/creek_modeling/events.sqlite`, survives restarts |
 | Tier evaluation | every 5 min; active NWS products floor the tier |
 | Dataset | JSONL parts per fast loop, consolidated to Parquet nightly |
 

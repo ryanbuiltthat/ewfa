@@ -19,7 +19,7 @@ import time
 from datetime import datetime
 
 from .commands import CommandProcessor, CommandQueue
-from .config import DATA_DIR, Config
+from .config import DATA_DIR, SHARE_DIR, Config
 from .dataset import DatasetWriter
 from .discovery import DiscoveryPublisher
 from .features import DERIVED_KEYS, FeatureBuilder
@@ -195,7 +195,7 @@ def main() -> int:
     health = HealthTracker()
     model = Model(cfg, registry)
     dataset = DatasetWriter(data_dir)
-    storms = StormLog(data_dir)
+    storms = StormLog(data_dir, SHARE_DIR)
 
     status = {
         "state": "idle",

@@ -143,6 +143,39 @@ def test_legacy_table_is_migrated_not_dropped():
     assert "api_at_onset_in" in s.latest()     # new columns added alongside
 
 
+def test_share_dir_is_preferred_and_a_legacy_data_log_is_moved_not_copied():
+    data = Path(tempfile.mkdtemp())
+    share = Path(tempfile.mkdtemp())
+    legacy = data / "events.sqlite"
+    StormLog(data).observe(row(T0, rain=0.5))     # a log that predates the /share move
+    assert legacy.exists()
+
+    s = StormLog(data, share)
+    moved = share / st.SHARE_SUBDIR / "events.sqlite"
+    assert s.path == moved and moved.exists()
+    # A copy would leave the service and the human editing different files.
+    assert not legacy.exists()
+    assert s.count(completed_only=False) == 1     # the existing storm came along
+
+
+def test_unusable_share_falls_back_to_data_rather_than_failing():
+    # `share` is a regular file, so mkdir under it raises NotADirectoryError. Permission
+    # bits would not work here: the add-on (and this suite) run as root, which ignores
+    # them — the realistic failures are share:rw dropped from config.yaml or /share gone.
+    data = Path(tempfile.mkdtemp())
+    share = Path(tempfile.mkdtemp()) / "not-a-dir"
+    share.touch()
+
+    s = StormLog(data, share)
+    assert s.path == data / "events.sqlite"
+    assert s.observe(row(T0, rain=0.5)) == "opened"   # still records
+
+
+def test_no_share_dir_keeps_the_data_path():
+    data = Path(tempfile.mkdtemp())
+    assert StormLog(data, None).path == data / "events.sqlite"
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

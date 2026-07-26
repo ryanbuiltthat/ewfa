@@ -29,8 +29,17 @@ else
 fi
 
 # --- Persistent storage (survives add-on updates/restarts) ---
-export DATA_DIR="/data"          # dataset.parquet, events.sqlite, model registry
+export DATA_DIR="/data"          # dataset.parquet, model registry, accumulator state
 mkdir -p "${DATA_DIR}/models" "${DATA_DIR}/datasets" "${DATA_DIR}/state"
+
+# The storm event log lives in /share instead of /data, because it is the one file a
+# human is expected to edit by hand. Each add-on gets its own /data, so `sqlite3
+# /data/events.sqlite` typed in the SSH/Terminal add-on silently opens an empty database
+# of that add-on's own — a trap that could hide months of un-annotated storms. /share is
+# mounted by every add-on and exported over Samba, so one path works from anywhere.
+export SHARE_DIR="/share"
+mkdir -p "${SHARE_DIR}/creek_modeling" || bashio::log.warning \
+  "Could not create ${SHARE_DIR}/creek_modeling — storm log stays in ${DATA_DIR}."
 
 bashio::log.info "Starting Ackerly Creek modeling service (fast loop ${FAST_LOOP_MINUTES}m)…"
 exec python3 -m app
