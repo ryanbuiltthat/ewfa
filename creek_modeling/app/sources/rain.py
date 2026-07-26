@@ -47,5 +47,9 @@ class RainAccumulator:
         rate_in = rate * self._unit_factor() if rate is not None else None
         sums = self._acc.update(rate_in)
         out = {f"rain_{w}h_in": v for w, v in sums.items()}
+        # Raw rate passes through so the watchdogs can see the Ecowitt entity itself go
+        # quiet: the accumulator keeps emitting totals either way, so its output alone
+        # cannot distinguish "no rain" from "gauge stopped reporting".
+        out["rain_rate_in_hr"] = rate_in
         out["api_index_in"] = self._api.update(self._acc.last_increment)
         return out

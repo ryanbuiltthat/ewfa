@@ -3,6 +3,41 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.10.0
+
+- **Watchdogs and soil templates move into the add-on.** The soil-moisture mean, the ponding
+  flag and eight of the nine sensor-fault watchdogs are now computed here and auto-created
+  via MQTT discovery, so they need no file copied into the HA config directory and no
+  `configuration.yaml` edit. `ha-packages/creek_warning.yaml` shrinks to just the tier
+  notification automation (it calls `persistent_notification`, so it has to be HA-side) and
+  the add-on's own liveness watchdog — a service cannot report its own death.
+- **The watchdogs are also more accurate here**, because the add-on can see two things a
+  template could not:
+  - *Whether a source is still alive.* The coordinator serves a source's last-good value
+    indefinitely, so a feature still holding a number proved nothing — `has_value()` stayed
+    true long after an API stopped answering. The coordinator now tracks each source's last
+    successful poll and the watchdogs key off that age.
+  - *Whether an input entity is reporting.* A rain rate legitimately sitting at 0.00 in/h
+    never changes state, so the old `last_changed` check false-alarmed through dry spells
+    and stayed quiet when the gauge actually died. The raw rate is now a feature
+    (`rain_rate_in_hr`, null when the entity is unavailable) and staleness tracks the last
+    usable read.
+  - A boot grace period means a cold start no longer lights up every watchdog at once, and
+    a source that is switched off is reported as fine rather than permanently missing.
+- **Fix: `creek_temperature` and `creek_rain_on_snow` never worked.** Both are derived in
+  `FeatureBuilder` rather than by a source, so they were absent from `FEATURE_KEYS` — and
+  the `creek/features` payload is built from that tuple, so the two entities referenced
+  fields that were never published and sat at unknown from 0.8.0. Derived keys are now
+  published explicitly, with a test that fails if any discovery template references a field
+  its topic does not carry.
+
+**Upgrade note:** entity IDs for the migrated entities gain the device prefix —
+`binary_sensor.creek_stage_stale` becomes
+`binary_sensor.ackerly_creek_modeling_creek_stage_stale`, and likewise for the soil mean,
+ponding and the other watchdogs. The bundled dashboard is updated. The old entities linger
+in the entity registry as unavailable until deleted (Settings → Devices & Services →
+Entities, filter Unavailable).
+
 ## 0.9.0
 
 - **Antecedent Precipitation Index — ingestion slice 2f** (spec §4/§5): `api_index_in`, an

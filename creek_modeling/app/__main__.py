@@ -22,7 +22,8 @@ from .commands import CommandProcessor, CommandQueue
 from .config import DATA_DIR, Config
 from .dataset import DatasetWriter
 from .discovery import DiscoveryPublisher
-from .features import FeatureBuilder
+from .features import DERIVED_KEYS, FeatureBuilder
+from .health import HealthTracker
 from .ha import HAClient
 from .model import Model
 from .mqtt_client import MqttClient
@@ -59,7 +60,7 @@ def _publish_registry(mqtt: MqttClient, registry: ModelRegistry) -> None:
 
 def _run_inference_once(
     features: FeatureBuilder, model: Model, dataset: DatasetWriter,
-    mqtt: MqttClient, status: dict,
+    mqtt: MqttClient, status: dict, health: HealthTracker = None, sources=None,
 ) -> str:
     row = features.build()
     pred = model.predict(row)
@@ -69,7 +70,17 @@ def _run_inference_once(
     tier, label, reasons = compute_tier(row, pred.flood_probability)
     mqtt.publish("alert_tier", {"value": tier, "label": label, "reasons": reasons,
                                 "why": "; ".join(reasons) or "nothing elevated"})
-    mqtt.publish("features", {k: getattr(row, k) for k in FEATURE_KEYS})
+    mqtt.publish("features",
+                 {k: getattr(row, k) for k in FEATURE_KEYS + DERIVED_KEYS})
+    # Soil mean + ponding come from the feature row too, so the HA package no longer has
+    # to recompute them from the raw Ecowitt probes.
+    mqtt.publish("soil", {"mean_pct": row.soil_moisture_mean_pct,
+                          "ponding": row.ponding_flag,
+                          "near_house_pct": row.soil_moisture_near_house_pct,
+                          "near_creek_pct": row.soil_moisture_near_creek_pct})
+    if health is not None and sources is not None:
+        mqtt.publish("status/health",
+                     health.evaluate(row, sources.health(), sources.configured()))
     dataset.append_row(row)
     status["last_inference_at"] = _now_iso()
     return f"p={pred.flood_probability} tier={tier} method={pred.method}"
@@ -143,6 +154,7 @@ def main() -> int:
 
     sources = SourceCoordinator(cfg, ha, data_dir)
     features = FeatureBuilder(cfg, ha, sources)
+    health = HealthTracker()
     model = Model(cfg, registry)
     dataset = DatasetWriter(data_dir)
 
@@ -156,7 +168,8 @@ def main() -> int:
 
     processor = CommandProcessor(
         {
-            "run_inference": lambda: _run_inference_once(features, model, dataset, mqtt, status),
+            "run_inference": lambda: _run_inference_once(
+                features, model, dataset, mqtt, status, health, sources),
             "retrain": lambda: _nightly_batch(cfg, dataset, mqtt, model, registry, status),
             "promote": lambda: _promote(mqtt, registry),
             "rollback": lambda: _rollback(mqtt, registry),
@@ -174,7 +187,7 @@ def main() -> int:
         while _running:
             _publish_pipeline(mqtt, status, "running", "inference")
             try:
-                _run_inference_once(features, model, dataset, mqtt, status)
+                _run_inference_once(features, model, dataset, mqtt, status, health, sources)
             except Exception:  # a transient feature/predict error must not kill the loop
                 log.exception("Inference failed")
                 status["last_error"] = "inference failed (see log)"

@@ -258,6 +258,40 @@ class DiscoveryPublisher:
                 "value_template": "{{ 'ON' if value_json.rain_on_snow_flag else 'OFF' }}",
                 "payload_on": "ON", "payload_off": "OFF",
                 "device_class": "safety", "icon": "mdi:weather-snowy-rainy"}),
+            # --- soil moisture (migrated out of the HA package) ---
+            ("sensor", "creek_soil_moisture_mean", {
+                "name": "Creek Soil Moisture Mean",
+                "state_topic": f"{b}/soil",
+                "value_template": "{{ value_json.mean_pct if value_json.mean_pct is not none else none }}",
+                "unit_of_measurement": "%", "device_class": "moisture",
+                "state_class": "measurement"}),
+            ("binary_sensor", "creek_soil_ponding", {
+                "name": "Creek Soil Ponding",
+                "state_topic": f"{b}/soil",
+                "value_template": "{{ 'ON' if value_json.ponding else 'OFF' }}",
+                "payload_on": "ON", "payload_off": "OFF",
+                "json_attributes_topic": f"{b}/soil",
+                "device_class": "moisture", "icon": "mdi:water-alert-outline"}),
+            # --- sensor-fault watchdogs (migrated out of the HA package) ---
+            *(
+                ("binary_sensor", f"creek_{key}", {
+                    "name": f"Creek {name}",
+                    "state_topic": f"{b}/status/health",
+                    "value_template": f"{{{{ 'ON' if value_json.{key} else 'OFF' }}}}",
+                    "payload_on": "ON", "payload_off": "OFF",
+                    "device_class": "problem", "icon": icon})
+                for key, name, icon in (
+                    ("stage_stale", "Stage Stale", "mdi:water-off-outline"),
+                    ("soil_moisture_stale", "Soil Moisture Stale", "mdi:water-off-outline"),
+                    ("rain_rate_stale", "Rain Rate Stale", "mdi:weather-cloudy-alert"),
+                    ("forecast_data_missing", "Forecast Data Missing", "mdi:cloud-off-outline"),
+                    ("nws_alerts_missing", "NWS Alert Feed Missing", "mdi:bell-off-outline"),
+                    ("upstream_data_missing", "Upstream Data Missing", "mdi:cloud-off-outline"),
+                    ("nwm_data_missing", "NWM Data Missing", "mdi:waves-arrow-right"),
+                    ("downstream_gauge_missing", "Downstream Gauge Missing", "mdi:gauge-empty"),
+                    ("snowpack_data_missing", "Snowpack Data Missing", "mdi:snowflake-off"),
+                )
+            ),
             # --- command buttons ---
             ("button", "creek_run_inference_now", {
                 "name": "Creek Run Inference Now",

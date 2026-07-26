@@ -385,11 +385,15 @@ The add-on publishes retained MQTT-discovery configs
 (`homeassistant/<component>/creek_modeling/<slug>/config`) for all of its `creek_*` sensors
 and command buttons, grouped under an **Ackerly Creek Modeling** device. HA creates/updates
 them with no package or `configuration.yaml` edit, and they re-publish on every reconnect so
-they track add-on updates. This supersedes the earlier "define them in a HA package" approach
-for the add-on's own entities. Entity IDs stay stable (name-derived, e.g.
-`sensor.creek_flood_probability`) so dashboards keep working. Only genuinely HA-side entities
-remain in a package: the soil-moisture templates, the Tier-0 automation, and the sensor-fault
-watchdogs (all in `creek_warning.yaml`).
+they track add-on updates. This supersedes the earlier "define them in a HA package" approach.
+Because each entity carries a `device` block, HA prefixes the device name when minting entity
+IDs — `sensor.ackerly_creek_modeling_creek_flood_probability`.
+
+The soil-moisture mean, the ponding flag and the sensor-fault watchdogs were migrated here
+too: the add-on already computed the first two, and it can see source liveness and input
+freshness that an HA template cannot. `creek_warning.yaml` is down to the two things that
+must stay HA-side — the tier notification automation (it calls `persistent_notification`) and
+the add-on's own liveness watchdog, since a service cannot report its own death.
 
 ### B.2 Model registry (`/data/models/registry.json`)
 

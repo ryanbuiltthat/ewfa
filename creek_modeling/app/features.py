@@ -29,6 +29,7 @@ class FeatureRow:
     soil_moisture_near_creek_pct: float | None   # WH51 #2, closest to creek
     ponding_flag: bool              # low-lying sensors saturated -> fast runoff
     # --- forecast/upstream features (Addendum C, filled by SourceCoordinator) ---
+    rain_rate_in_hr: float | None = None   # raw Ecowitt rate; None = entity unavailable
     rain_1h_in: float | None = None
     rain_3h_in: float | None = None
     rain_6h_in: float | None = None
@@ -65,6 +66,11 @@ class FeatureRow:
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+
+# Features derived here rather than by a source. They are not in sources.FEATURE_KEYS, so
+# they must be added explicitly wherever the feature payload is assembled.
+DERIVED_KEYS = ("temp_f", "rain_on_snow_flag")
 
 
 # Above this soil-moisture reading the low-lying areas are effectively saturated

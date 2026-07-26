@@ -54,6 +54,9 @@ CHUNK = 1 << 20
 class SnodasSwe:
     name = "snodas"
     refresh_seconds = 6 * 3600      # daily product; a few tries a day covers late posting
+    # SNODAS legitimately skips days, and the fetch already walks back MAX_LOOKBACK_DAYS,
+    # so only a multi-day drought of postings is worth flagging.
+    stale_after_seconds = 3 * 86400
 
     def __init__(self, lat: float, lon: float, state_dir: Path,
                  today_fn=date.today, timeout: float = 120.0):

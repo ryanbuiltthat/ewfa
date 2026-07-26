@@ -3,158 +3,38 @@
 #   homeassistant:
 #     packages: !include_dir_named ha-packages
 #
-# SCOPE: the genuinely HA-side pieces only — WH51 soil-moisture templates, watchdogs that
-# observe other integrations, and the tier notification automation. Ingestion (rain
-# accumulations, NWS QPF, WU upstream, NWM reach, USGS downstream) and tier *evaluation*
-# live in the add-on and arrive via MQTT discovery (spec Addenda B/C).
+# SCOPE: only the two things that genuinely cannot live in the add-on.
+#
+# Everything else that used to be here — the soil-moisture mean, the ponding flag, and the
+# sensor-fault watchdogs — is now computed by the add-on and auto-provisioned via MQTT
+# discovery (spec Addendum B.1a), so it needs no file copied into the HA config directory
+# and no configuration.yaml edit. Those entities are also more accurate there: the add-on
+# can see when a source last answered and when an input entity last produced a usable
+# value, neither of which a template could observe.
 #
 # ENTITY-ID CONVENTION: add-on entities carry the device-name prefix HA applies to
 # MQTT-discovery entities — `sensor.ackerly_creek_modeling_creek_*`. Entities defined in
 # THIS file, and the ESPHome creek node, do not: they are plain `sensor.creek_*`.
-#
-# Placeholder thresholds are marked and MUST be calibrated (open questions #5/#7).
 
 template:
-  - sensor:
-      - name: "Creek Soil Moisture Mean"
-        unique_id: creek_soil_moisture_mean
-        unit_of_measurement: "%"
-        state_class: measurement
-        device_class: moisture
-        # Mean of the two WH51 probes (near-house/willow + near-creek), ignoring any
-        # probe that is momentarily unavailable.
-        state: >
-          {% set a = states('sensor.outside_weather_station_soil_moisture_1') | float(none) %}
-          {% set b = states('sensor.outside_weather_station_soil_moisture_2') | float(none) %}
-          {% set vals = [a, b] | reject('none') | list %}
-          {{ ((vals | sum) / (vals | count)) | round(1) if vals | count > 0 else none }}
-        availability: >
-          {{ has_value('sensor.outside_weather_station_soil_moisture_1')
-             or has_value('sensor.outside_weather_station_soil_moisture_2') }}
-
   - binary_sensor:
-      - name: "Creek Soil Ponding"
-        unique_id: creek_soil_ponding
-        device_class: moisture
-        # Low-lying burial spots saturate/pond faster than the rest of the property,
-        # shortening the rainfall->runoff response. ON when either probe is "saturated".
-        # PLACEHOLDER threshold (85%) — calibrate the empirical saturated value per
-        # open question #7 before relying on this.
-        state: >
-          {% set thresh = 85 %}
-          {% set a = states('sensor.outside_weather_station_soil_moisture_1') | float(0) %}
-          {% set b = states('sensor.outside_weather_station_soil_moisture_2') | float(0) %}
-          {{ a >= thresh or b >= thresh }}
-        # Unavailable (not a false "dry") when both probes are missing; a separate
-        # stale-data watchdog (spec §4) handles the alerting on that.
-        availability: >
-          {{ has_value('sensor.outside_weather_station_soil_moisture_1')
-             or has_value('sensor.outside_weather_station_soil_moisture_2') }}
-        attributes:
-          near_house_pct: "{{ states('sensor.outside_weather_station_soil_moisture_1') }}"
-          near_creek_pct: "{{ states('sensor.outside_weather_station_soil_moisture_2') }}"
-
-      # Sensor-fault watchdogs (spec §4): ON = a source has gone stale/missing. These are
-      # HA-side by nature (they observe other integrations + the add-on's liveness) so they
-      # stay in this package rather than moving to add-on MQTT discovery. Each guards against
-      # the entity not existing yet (Phase 1/2) via short-circuit. The prefixed
-      # sensor.ackerly_creek_modeling_* entities are auto-created by the add-on's discovery.
-      - name: "Creek Stage Stale"
-        unique_id: creek_stage_stale
-        device_class: problem
-        state: >
-          {% set e = states.sensor.creek_stage %}
-          {{ e is none or e.state in ['unknown', 'unavailable']
-             or (now() - e.last_changed).total_seconds() > 1800 }}
-
-      - name: "Creek Soil Moisture Stale"
-        unique_id: creek_soil_moisture_stale
-        device_class: problem
-        state: >
-          {% set e = states.sensor.creek_soil_moisture_mean %}
-          {{ e is none or e.state in ['unknown', 'unavailable']
-             or (now() - e.last_changed).total_seconds() > 3600 }}
-
-      - name: "Creek Rain Rate Stale"
-        unique_id: creek_rain_rate_stale
-        device_class: problem
-        state: >
-          {% set e = states.sensor.weather_station_rain_rate %}
-          {{ e is none or e.state in ['unknown', 'unavailable']
-             or (now() - e.last_changed).total_seconds() > 3600 }}
-
+      # The one watchdog that cannot move into the add-on: a service cannot report its own
+      # death. The add-on publishes pipeline status every fast loop (default 5 min),
+      # toggling idle/running, so last_changed tracks liveness. No update in 15 min means
+      # it is stopped or wedged. (Its MQTT LWT also flips every discovered entity to
+      # unavailable when it disconnects, which covers the common case on its own.)
       - name: "Creek Modeling Service Stale"
         unique_id: creek_modeling_service_stale
         device_class: problem
-        # The add-on publishes pipeline status every fast loop (default 5 min), toggling
-        # idle/running, so last_changed tracks liveness. No update in 15 min means the
-        # service is likely stopped or wedged. (Its MQTT LWT also flips the discovered
-        # entities to unavailable when it disconnects.)
         state: >
           {% set e = states.sensor.ackerly_creek_modeling_creek_pipeline_state %}
           {{ e is none or e.state in ['unknown', 'unavailable']
              or (now() - e.last_changed).total_seconds() > 900 }}
 
-      # Ingest-source watchdogs. These deliberately test for a *value* rather than for
-      # last_changed: the add-on republishes every feature each fast loop, but a feature
-      # that legitimately sits at 0.00 in (no rain for a day) never changes state, so a
-      # staleness check would false-alarm constantly. A source that fails with no cached
-      # value publishes null instead, which lands as unknown/unavailable — that is the
-      # real signal. Add-on downtime is already covered above and by the MQTT LWT.
-      - name: "Creek Forecast Data Missing"
-        unique_id: creek_forecast_data_missing
-        device_class: problem
-        # NWS QPF — the Tier 1 Advisory input. Without it no forecast-driven tier fires.
-        state: >
-          {{ not has_value('sensor.ackerly_creek_modeling_creek_qpf_6h')
-             or not has_value('sensor.ackerly_creek_modeling_creek_qpf_24h') }}
-
-      - name: "Creek Upstream Data Missing"
-        unique_id: creek_upstream_data_missing
-        device_class: problem
-        # WU upstream PWS — the Tier 2 Watch input. Fires if every configured station is
-        # down or the API key/station IDs are wrong.
-        state: >
-          {{ not has_value('sensor.ackerly_creek_modeling_creek_upstream_rain_3h') }}
-
-      - name: "Creek Snowpack Data Missing"
-        unique_id: creek_snowpack_data_missing
-        device_class: problem
-        # SNODAS is a daily product fetched with a lookback window, so this only fires
-        # once several consecutive days are unavailable. Off-season a bare ground cell
-        # reads 0.00 in rather than null, so this is not just "no snow".
-        state: >
-          {{ not has_value('sensor.ackerly_creek_modeling_creek_snow_water_equivalent') }}
-
-      - name: "Creek NWS Alerts Missing"
-        unique_id: creek_nws_alerts_missing
-        device_class: problem
-        # The alert feed reports 0 active products as 0, not as null — so an unavailable
-        # count means the API call itself is failing, and a Flood Warning could be in
-        # effect without us force-promoting the tier (spec §6).
-        state: >
-          {{ not has_value('sensor.ackerly_creek_modeling_creek_nws_alert_count') }}
-
-      - name: "Creek NWM Data Missing"
-        unique_id: creek_nwm_data_missing
-        device_class: problem
-        state: >
-          {{ not has_value('sensor.ackerly_creek_modeling_creek_nwm_flow') }}
-
-      - name: "Creek Downstream Gauge Missing"
-        unique_id: creek_downstream_gauge_missing
-        device_class: problem
-        # Both USGS gauges out — NWIS outage or a site off-line for maintenance. One of
-        # the two being available is fine, so this only fires when both are gone.
-        state: >
-          {{ not has_value('sensor.ackerly_creek_modeling_creek_usgs_leggetts_gage')
-             and not has_value('sensor.ackerly_creek_modeling_creek_usgs_tunkhannock_gage') }}
-
 automation:
-  # Tier evaluation itself lives in the add-on (app/tiers.py) and arrives as
-  # sensor.ackerly_creek_modeling_creek_alert_tier. This automation is only the HA-side
-  # *action* half of spec §6. It supersedes the old Tier 0 placeholder, which keyed off a
-  # sensor.nws_qpf_24h REST sensor that Addendum C decided never to build.
+  # Tier evaluation lives in the add-on (app/tiers.py) and arrives as
+  # sensor.ackerly_creek_modeling_creek_alert_tier. This automation is the HA-side *action*
+  # half of spec §6 — it has to be here because it calls persistent_notification.
   #
   # Tier scale: 0 All-clear · 1 Advisory · 2 Watch · 3 Warning · 4 Emergency.
   #

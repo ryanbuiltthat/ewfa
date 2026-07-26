@@ -20,10 +20,11 @@ def test_topics_and_counts():
     sensors = [t for t, _ in pairs if "/sensor/" in t]
     binaries = [t for t, _ in pairs if "/binary_sensor/" in t]
     buttons = [t for t, _ in pairs if "/button/" in t]
-    # 15 status/model + 7 (2a) + 8 (2b) + 6 (2c) + 1 (2d) + 2 (2e) + 1 (2f API index)
-    assert len(sensors) == 40, len(sensors)
-    # 2d NWS watch/warning/flash flags + 2e rain-on-snow
-    assert len(binaries) == 4, len(binaries)
+    # 15 status/model + 8 (2a incl. API index) + 8 (2b) + 6 (2c) + 1 (2d) + 2 (2e)
+    # + 1 soil mean (migrated out of the HA package)
+    assert len(sensors) == 41, len(sensors)
+    # 3 NWS flags + rain-on-snow + ponding + 9 watchdogs (migrated from the package)
+    assert len(binaries) == 14, len(binaries)
     assert len(buttons) == 4, len(buttons)
     for topic, _ in pairs:
         assert topic.startswith("homeassistant/")
@@ -74,10 +75,37 @@ def test_rain_and_qpf_sensors_present():
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 48
+    assert len(published) == 59
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON
+
+
+def test_every_value_template_resolves_against_a_published_payload():
+    """Guards a real bug: `creek_temperature` and `creek_rain_on_snow` referenced
+    `temp_f` / `rain_on_snow_flag`, which are derived in FeatureBuilder and so were not in
+    FEATURE_KEYS — the payload never carried them and both entities stayed unknown."""
+    import re
+
+    from app.features import DERIVED_KEYS
+    from app.health import WATCHDOG_KEYS
+    from app.sources import FEATURE_KEYS
+
+    payloads = {
+        "features": set(FEATURE_KEYS) | set(DERIVED_KEYS),
+        "status/health": set(WATCHDOG_KEYS),
+        "soil": {"mean_pct", "ponding", "near_house_pct", "near_creek_pct"},
+    }
+    pub, _ = build()
+    missing = []
+    for _, cfg in pub.configs():
+        topic = cfg.get("state_topic", "").removeprefix("creek/")
+        if topic not in payloads:
+            continue
+        for ref in re.findall(r"value_json\.(\w+)", cfg.get("value_template", "")):
+            if ref not in payloads[topic]:
+                missing.append((cfg["object_id"], topic, ref))
+    assert not missing, missing
 
 
 def main():

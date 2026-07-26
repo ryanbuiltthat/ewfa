@@ -12,14 +12,14 @@
 #         filename: dashboards/creek_flood_watch.yaml
 #
 # Stock cards only (gauge / history-graph / entities / markdown / button), styled by the
-# Prism theme. Requires the creek_modeling add-on to be running (it auto-creates its own
-# entities via MQTT discovery) plus ha-packages/creek_warning.yaml for the soil-moisture
-# templates and watchdogs. Entities that don't exist yet (e.g. sensor.creek_stage before
-# the ESPHome node is live) degrade gracefully.
+# Prism theme. Nearly everything here is auto-created by the creek_modeling add-on via MQTT
+# discovery, so it appears as soon as the add-on runs — no package required. Only
+# binary_sensor.creek_modeling_service_stale comes from ha-packages/creek_warning.yaml, and
+# sensor.creek_stage from the ESPHome node; both degrade gracefully when absent.
 #
 # ENTITY IDs: add-on entities are MQTT-discovery entities on the "Ackerly Creek Modeling"
-# device, so HA prefixes them -> sensor.ackerly_creek_modeling_creek_*. Entities from the
-# HA package and the ESPHome node are unprefixed -> sensor.creek_*.
+# device, so HA prefixes them -> sensor.ackerly_creek_modeling_creek_*. The two exceptions
+# above are unprefixed -> sensor.creek_*.
 #
 # NOTE: `theme: Prism` assumes that theme is installed under that exact name — adjust or
 # remove the theme keys if yours differs.
@@ -80,9 +80,9 @@ views:
             name: Predicted crest
           - entity: sensor.ackerly_creek_modeling_creek_lag_estimate
             name: Lag estimate
-          - entity: sensor.creek_soil_moisture_mean
+          - entity: sensor.ackerly_creek_modeling_creek_soil_moisture_mean
             name: Soil moisture (mean)
-          - entity: binary_sensor.creek_soil_ponding
+          - entity: binary_sensor.ackerly_creek_modeling_creek_soil_ponding
             name: Low-lying ponding
 
       - type: entities
@@ -280,26 +280,27 @@ views:
         title: Watchdogs
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.creek_stage_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_stage_stale
             name: Creek stage stale
-          - entity: binary_sensor.creek_soil_moisture_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_soil_moisture_stale
             name: Soil moisture stale
-          - entity: binary_sensor.creek_rain_rate_stale
+          - entity: binary_sensor.ackerly_creek_modeling_creek_rain_rate_stale
             name: Rain rate stale
+          # Stays HA-side: the add-on cannot report its own death.
           - entity: binary_sensor.creek_modeling_service_stale
             name: Modeling service stale
           - type: divider
           # Ingest sources — ON means the source published no value, not that the value
           # is old (a legitimate 0.00 in never changes state).
-          - entity: binary_sensor.creek_forecast_data_missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_forecast_data_missing
             name: NWS QPF missing
-          - entity: binary_sensor.creek_upstream_data_missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_upstream_data_missing
             name: Upstream PWS missing
-          - entity: binary_sensor.creek_nwm_data_missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_nwm_data_missing
             name: NWM reach missing
-          - entity: binary_sensor.creek_downstream_gauge_missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_downstream_gauge_missing
             name: USGS gauges missing
-          - entity: binary_sensor.creek_snowpack_data_missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_snowpack_data_missing
             name: SNODAS snowpack missing
-          - entity: binary_sensor.creek_nws_alerts_missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_nws_alerts_missing
             name: NWS alert feed missing

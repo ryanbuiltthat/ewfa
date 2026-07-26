@@ -84,12 +84,15 @@ Set these on the **Configuration** tab.
   (`homeassistant_api: true`).
 - **Writes** its outputs, ingested features and status over MQTT (broker discovered via
   services) and auto-creates the matching HA entities via MQTT discovery — no package edit.
+- **Watchdogs** for every input and source are computed in the add-on and published on
+  `creek/status/health`, so they appear automatically with everything else.
 - **Entity IDs:** the discovered entities belong to an *Ackerly Creek Modeling* device, so
   Home Assistant prefixes the device name:
   `sensor.ackerly_creek_modeling_creek_flood_probability`,
   `sensor.ackerly_creek_modeling_creek_qpf_24h`, and so on. Entities defined in
-  `ha-packages/creek_warning.yaml` (soil-moisture mean, ponding, watchdogs) and the ESPHome
-  creek node are *not* discovery entities and stay unprefixed (`sensor.creek_*`).
+  `ha-packages/creek_warning.yaml` and the ESPHome creek node are *not* discovery entities and
+  stay unprefixed (`sensor.creek_*`). That package is now down to two things that cannot live
+  here: the tier notification automation, and the add-on's own liveness watchdog.
 
 ## Alert tiers
 

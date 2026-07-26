@@ -29,6 +29,7 @@ log = logging.getLogger("app.sources")
 # Numeric features produced by the ingestion sources, in publish/record order.
 FEATURE_KEYS = (
     # 2a — on-site rain + NWS QPF
+    "rain_rate_in_hr",
     "rain_1h_in", "rain_3h_in", "rain_6h_in", "rain_24h_in", "rain_72h_in",
     "qpf_6h_in", "qpf_24h_in",
     # 2f — antecedent precipitation index (rides on the on-site rain samples)
@@ -88,6 +89,7 @@ class SourceCoordinator:
 
         self._cache: dict[str, float | None] = {}
         self._next_poll: dict[str, float] = {}
+        self._last_ok: dict[str, float] = {}
 
     def features(self) -> dict:
         """Merged latest feature values; polls each source only when its interval elapses."""
@@ -96,7 +98,31 @@ class SourceCoordinator:
             if now >= self._next_poll.get(src.name, 0.0):
                 try:
                     self._cache.update(src.poll())
+                    self._last_ok[src.name] = now
                 except Exception:  # keep last-good cache; never break the loop
                     log.exception("source %s poll failed", src.name)
                 self._next_poll[src.name] = now + src.refresh_seconds
         return {k: self._cache.get(k) for k in FEATURE_KEYS}
+
+    def health(self) -> dict[str, dict]:
+        """Per-source liveness for the watchdogs.
+
+        `age` is seconds since the source last polled successfully, or None if it never
+        has. This is the thing the old HA-template watchdogs could not see: the
+        coordinator keeps serving a source's last-good value indefinitely, so a feature
+        still having a number proves nothing about whether its source is still alive.
+        """
+        now = time.monotonic()
+        out = {}
+        for src in self._sources:
+            last = self._last_ok.get(src.name)
+            out[src.name] = {
+                "age": None if last is None else now - last,
+                "stale_after": getattr(src, "stale_after_seconds", None)
+                or max(4 * src.refresh_seconds, 1800),
+            }
+        return out
+
+    def configured(self) -> set[str]:
+        """Names of the sources actually built — an absent source is not a fault."""
+        return {src.name for src in self._sources}
