@@ -40,7 +40,7 @@ times**, roughly is fine:
 Time-stamped phone photos count as all of the above.
 
 - [ ] **While the ground is soaked**, write down both soil probes at peak wetness:
-      `..._soil_moisture_field` (house) and `..._soil_moisture_willow` (creek).
+      `..._soil_moisture_willow` (house) and `..._soil_moisture_field` (creek).
       These are the "saturated" endpoints for open question #7. Grab the "dry" values in
       the next dry spell.
 

@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.11.6"
+version: "0.11.7"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa
@@ -43,10 +43,10 @@ options:
   stage_entity: sensor.creek_stage
   soil_moisture_entities:
     # Order is significant: [0] -> soil_moisture_near_house_pct, [1] -> ..._near_creek_pct.
-    # WH51 #1 — near the house (low-lying, ponds early)
-    - sensor.outside_weather_station_soil_moisture_field
-    # WH51 #2 — furthest from house, closest to the creek (low-lying, ponds early)
+    # WH51 #1 — near the house, by the willow tree (low-lying, ponds early)
     - sensor.outside_weather_station_soil_moisture_willow
+    # WH51 #2 — furthest from house, closest to the creek (low-lying, ponds early)
+    - sensor.outside_weather_station_soil_moisture_field
   onsite_rain_rate_entity: sensor.outside_weather_station_rain_intensity
   onsite_rain_daily_entity: sensor.outside_weather_station_rain_daily
   # Nearest USGS gauges (01534860 Lackawanna/Leggetts, 01534000 Tunkhannock) — free, no key.
@@ -55,7 +55,7 @@ options:
   # SNODAS snow water equivalent for the site's grid cell — free, no key. Feeds the
   # rain-on-snow flag (spec §1); pair it with onsite_temp_entity for that to fire.
   snodas_swe: true
-  onsite_temp_entity: sensor.weather_station_outdoor_temperature
+  onsite_temp_entity: sensor.outside_weather_station_outdoors_temp
 
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)

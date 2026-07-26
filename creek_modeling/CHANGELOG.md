@@ -3,6 +3,28 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.7
+
+- **Soil probe mapping corrected — the two probes were swapped in 0.11.6.** The willow is
+  by the house, the field probe is the one near the creek, confirmed by the owner. The
+  original `config.yaml` comment ("near the house, by the willow tree") had it right all
+  along; the labels in `84ff4f5` transposed them, and 0.11.6 propagated that.
+
+  | | Entity |
+  |---|---|
+  | `soil_moisture_entities[0]` → `soil_moisture_near_house_pct` | `..._soil_moisture_willow` |
+  | `soil_moisture_entities[1]` → `soil_moisture_near_creek_pct` | `..._soil_moisture_field` |
+
+  Nothing downstream distinguishes the two probes today — the ponding flag and the Tier 1
+  soil condition both run off the mean, which is unaffected by the order. It matters for
+  the per-probe dataset columns and for the WH51 field calibration (open question #7),
+  where "saturated" for a probe by the house is not the same number as one near the creek.
+  Dashboard labels corrected to match.
+
+- **`onsite_temp_entity` set to `sensor.outside_weather_station_outdoors_temp`**, resolving
+  the one Ecowitt ID left guessed in 0.11.6. This is the rain-on-snow flag's temperature
+  input (spec §1), which could not have fired with a dead entity.
+
 ## 0.11.6
 
 - **Ecowitt entity defaults corrected.** `84ff4f5` fixed the dashboard to the real entity

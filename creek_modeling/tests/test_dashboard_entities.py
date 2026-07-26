@@ -25,8 +25,8 @@ PACKAGE = ROOT / "ha-packages" / "creek_warning.yaml"
 # Entities that legitimately come from outside the add-on.
 EXTERNAL = {
     "sensor.creek_stage",                              # ESPHome creek node (not built yet)
-    "sensor.outside_weather_station_soil_moisture_field",   # Ecowitt WH51 — near house
-    "sensor.outside_weather_station_soil_moisture_willow",  # Ecowitt WH51 — near creek
+    "sensor.outside_weather_station_soil_moisture_willow",  # Ecowitt WH51 #1 — near house, by the willow
+    "sensor.outside_weather_station_soil_moisture_field",   # Ecowitt WH51 #2 — near creek
     "sensor.outside_weather_station_rain_intensity",
     "sensor.outside_weather_station_rain_daily",
 }

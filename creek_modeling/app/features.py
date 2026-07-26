@@ -25,8 +25,8 @@ class FeatureRow:
     stage_ft: float | None          # current creek stage
     rate_of_rise_in_min: float | None
     soil_moisture_mean_pct: float | None
-    soil_moisture_near_house_pct: float | None   # WH51 #1 = soil_moisture_entities[0]
-    soil_moisture_near_creek_pct: float | None   # WH51 #2 = soil_moisture_entities[1]
+    soil_moisture_near_house_pct: float | None   # WH51 #1, by the willow = entities[0]
+    soil_moisture_near_creek_pct: float | None   # WH51 #2, near the creek = entities[1]
     ponding_flag: bool              # low-lying sensors saturated -> fast runoff
     # --- forecast/upstream features (Addendum C, filled by SourceCoordinator) ---
     rain_rate_in_hr: float | None = None   # raw Ecowitt rate; None = entity unavailable
