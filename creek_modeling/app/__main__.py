@@ -24,7 +24,7 @@ from .dataset import DatasetWriter
 from .discovery import DiscoveryPublisher
 from .features import DERIVED_KEYS, FeatureBuilder
 from .health import HealthTracker
-from .lag import estimate_lag
+from .lag import estimate_lag, load_lag, save_lag
 from .ha import HAClient
 from .model import Model
 from .mqtt_client import MqttClient
@@ -100,6 +100,27 @@ def _publish_storms(mqtt: MqttClient, storms: StormLog) -> None:
     })
 
 
+def _publish_lag(mqtt: MqttClient, lag: dict) -> None:
+    mqtt.publish("status/lag", lag)
+    mqtt.publish("lag_estimate", {"value": lag["lag_minutes"],
+                                  "response": lag["response"],
+                                  "correlation": lag["correlation"],
+                                  "reason": lag["reason"]})
+
+
+def _publish_model_health(cfg: Config, mqtt: MqttClient, rows: int, events: int,
+                          ran_at: str | None) -> str:
+    method = "ml" if events >= cfg.min_events_for_ml else "threshold"
+    mqtt.publish("model_health", {
+        "dataset_rows": rows,
+        "event_count": events,
+        "min_events_for_ml": cfg.min_events_for_ml,
+        "active_method": method,
+        "ran_at": ran_at,
+    })
+    return method
+
+
 def _nightly_batch(
     cfg: Config, dataset: DatasetWriter, mqtt: MqttClient, model: Model,
     registry: ModelRegistry, status: dict, storms: StormLog = None,
@@ -115,29 +136,16 @@ def _nightly_batch(
     # First lag/response estimate (§7 Phase 3). Falls back to a downstream gauge while the
     # creek node is missing — that number is the sanity check, not Ackerly's lag.
     lag = estimate_lag(dataset.frame())
-    mqtt.publish("status/lag", lag)
-    mqtt.publish("lag_estimate", {"value": lag["lag_minutes"],
-                                  "response": lag["response"],
-                                  "correlation": lag["correlation"],
-                                  "reason": lag["reason"]})
+    save_lag(DATA_DIR, lag)      # so a restart republishes it instead of showing unknown
+    _publish_lag(mqtt, lag)
 
     log.info("Nightly batch: dataset=%d rows, events=%d, lag=%s",
              rows, events, lag["lag_minutes"])
     # Phase 4: append day's data, recalibrate/retrain, version artifact via
     # registry.set_candidate(version, metrics), log skill metrics.
-    method = "ml" if events >= cfg.min_events_for_ml else "threshold"
     ran_at = _now_iso()
     status["last_nightly_at"] = ran_at
-    mqtt.publish(
-        "model_health",
-        {
-            "dataset_rows": rows,
-            "event_count": events,
-            "min_events_for_ml": cfg.min_events_for_ml,
-            "active_method": method,
-            "ran_at": ran_at,
-        },
-    )
+    method = _publish_model_health(cfg, mqtt, rows, events, ran_at)
     _publish_registry(mqtt, registry)
     return f"rows={rows} events={events} lag={lag['lag_minutes']} method={method}"
 
@@ -209,9 +217,13 @@ def main() -> int:
     )
 
     # Prime the dashboard sensors immediately.
+    # Prime the dashboard. model_health and the lag estimate are otherwise only published
+    # by the nightly batch, so without this their entities sit at unknown until 3 AM.
     _publish_pipeline(mqtt, status, "idle", "none")
     _publish_registry(mqtt, registry)
     _publish_storms(mqtt, storms)
+    _publish_model_health(cfg, mqtt, dataset.row_count(), model.event_count(), None)
+    _publish_lag(mqtt, load_lag(data_dir))
 
     last_nightly_day: int | None = None
     interval = max(1, cfg.fast_loop_minutes) * 60

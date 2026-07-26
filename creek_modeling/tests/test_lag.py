@@ -9,7 +9,9 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.lag import estimate_lag  # noqa: E402
+from app.lag import (  # noqa: E402
+    LAG_WINDOW_DAYS, estimate_lag, load_lag, save_lag,
+)
 
 T0 = 1769904000.0
 STEP = 300.0        # the 5-minute fast loop
@@ -132,6 +134,44 @@ def test_irregularly_spaced_storms_still_resolve():
 
 def test_handles_none_input():
     assert estimate_lag(None)["lag_minutes"] is None
+
+
+def test_only_the_recent_window_is_fitted():
+    """Cost grows with the dataset, and a lag averaged across seasons is the wrong
+    number anyway — March snowmelt on saturated ground is not an August thunderstorm."""
+    recent = synthetic(60, n=300)
+    # Prepend a year of older samples with a deliberately different lag.
+    old = synthetic(300, n=300)
+    old["ts"] = old["ts"] - 400 * 86400
+    df = pd.concat([old, recent], ignore_index=True)
+    out = estimate_lag(df)
+    assert out["lag_minutes"] == 60, out           # the stale 300 min fit is excluded
+    assert out["samples"] < len(df)
+
+
+def test_window_is_measured_from_the_newest_sample_not_wall_clock():
+    # The dataset may be replayed or restored; anchoring to now() would discard it all.
+    df = synthetic(60, n=300)
+    df["ts"] = df["ts"] - 5 * 365 * 86400          # five years stale
+    assert estimate_lag(df)["lag_minutes"] == 60
+
+
+def test_persisted_lag_survives_a_restart():
+    import tempfile
+    d = Path(tempfile.mkdtemp())
+    assert load_lag(d)["lag_minutes"] is None
+    assert "pending" in load_lag(d)["reason"]      # safe to publish before any nightly run
+    result = estimate_lag(synthetic(60))
+    save_lag(d, result)
+    assert load_lag(d)["lag_minutes"] == 60
+
+
+def test_corrupt_lag_state_falls_back_to_the_placeholder():
+    import tempfile
+    d = Path(tempfile.mkdtemp())
+    (d / "state").mkdir(parents=True)
+    (d / "state" / "lag.json").write_text("{ not json", encoding="utf-8")
+    assert load_lag(d)["lag_minutes"] is None
 
 
 def main():

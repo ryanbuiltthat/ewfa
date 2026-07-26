@@ -3,6 +3,24 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.11.3
+
+- **Prime the dashboard at startup.** `model_health` and the lag estimate were published
+  only by the nightly batch, so `Creek Model Health`, `Creek Dataset Rows`, `Creek Lag
+  Estimate` and `Creek Lag Response Series` sat at *unknown* until 3 AM on a fresh install
+  or after any restart — waiting a few minutes never helped. All four are now published once
+  at startup. (`creek_lag_estimate` regressed in 0.11.0, which moved the publish out of the
+  fast loop; the other three have been this way since the beginning.)
+- **The lag estimate persists** to `/data/state/lag.json`, so a restart republishes the last
+  computed value instead of a placeholder. Before the first nightly run it publishes a
+  "pending the first nightly run" reason rather than nothing.
+- **Bound the lag fit to the most recent 90 days.** Cost grew linearly with the dataset —
+  measured at 15.5 s for a year of 5-minute samples and unbounded after that. It is now flat
+  at ~3.5 s no matter how long the record gets. This is also the better estimate: a lag
+  averaged across seasons is the wrong number, since March snowmelt on saturated ground is
+  not the same warning window as an August thunderstorm. The window is measured from the
+  newest sample rather than wall-clock, so a restored or replayed dataset still fits.
+
 ## 0.11.2
 
 - **Fix five dashboard cards showing "Entity not found" on a healthy system.** Home

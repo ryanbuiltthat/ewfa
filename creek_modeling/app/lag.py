@@ -20,6 +20,7 @@ from numpy so the estimator has no dependency beyond pandas.
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 
@@ -30,6 +31,12 @@ log = logging.getLogger("app.lag")
 MIN_LAG_MIN = 0
 MAX_LAG_MIN = 720
 LAG_STEP_MIN = 15
+
+# Only fit against the recent record. Two reasons: cost grows linearly with the dataset
+# (~15 s at a year of 5-minute samples, unbounded after that), and a lag averaged across
+# seasons is the wrong number anyway — the warning window during March snowmelt on
+# saturated ground is not the one that applies to an August thunderstorm.
+LAG_WINDOW_DAYS = 90
 
 # Guardrails — a lag fitted on too little data, or on a period with no rain, is noise.
 MIN_PAIRS = 24                 # overlapping samples after shifting
@@ -99,6 +106,9 @@ def estimate_lag(df) -> dict:
     result["rain_series"] = rain_col
 
     frame = df[["ts", rain_col, response_col]].dropna().sort_values("ts")
+    if len(frame):
+        cutoff = float(frame["ts"].iloc[-1]) - LAG_WINDOW_DAYS * 86400
+        frame = frame[frame["ts"] >= cutoff]
     if len(frame) < MIN_PAIRS:
         result["reason"] = "not enough overlapping samples"
         return result
@@ -163,3 +173,26 @@ def _nearest(times: list[float], target: float, tolerance: float = 600.0) -> flo
             hi = mid
     best = min((times[max(0, lo - 1)], times[lo]), key=lambda t: abs(t - target))
     return best if abs(best - target) <= tolerance else None
+
+
+# --- persistence -------------------------------------------------------------------
+# The estimate is computed in the nightly batch, so without this a restart would leave
+# the lag entities at unknown until 3 AM. Storing the last result lets startup republish
+# it immediately.
+def save_lag(state_dir, result: dict) -> None:
+    path = state_dir / "state" / "lag.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result), encoding="utf-8")
+    except OSError as exc:
+        log.warning("could not persist lag estimate: %s", exc)
+
+
+def load_lag(state_dir) -> dict:
+    """Last stored estimate, or a placeholder that is safe to publish at startup."""
+    try:
+        return json.loads((state_dir / "state" / "lag.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError, OSError):
+        return {"lag_minutes": None, "correlation": None, "response": None,
+                "rain_series": None, "samples": 0,
+                "reason": "pending the first nightly run"}
