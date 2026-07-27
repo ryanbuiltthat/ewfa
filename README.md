@@ -1,6 +1,7 @@
 # Creek Flood Early-Warning System
 
 [![tests](https://github.com/ryanbuiltthat/ewfa/actions/workflows/tests.yml/badge.svg)](https://github.com/ryanbuiltthat/ewfa/actions/workflows/tests.yml)
+[![esphome](https://github.com/ryanbuiltthat/ewfa/actions/workflows/esphome.yml/badge.svg)](https://github.com/ryanbuiltthat/ewfa/actions/workflows/esphome.yml)
 
 A DIY flood early-warning system for a property mid-watershed on Ackerly Creek (Lackawanna County, PA) — built on Home Assistant, ESPHome, and a radar-based stream gauge, with a roadmap toward predictive flood-probability modeling.
 

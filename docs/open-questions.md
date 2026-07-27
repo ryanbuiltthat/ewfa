@@ -31,3 +31,13 @@ resolution as each is answered.
    creek response from those that did not.
 10. Rain-on-snow thresholds (`app/features.py`: 0.20 in SWE, 34 °F) are placeholders, and
    the flag cannot be validated until a winter rain-on-snow event is actually captured.
+
+11. Solar/battery sizing for the creek node. The firmware draws ~80 mA continuously
+   (~1.93 Ah/day): SEN0676 at 30 mA plus the C6 at an estimated ~45 mA with WiFi up. That
+   needs ~2.6 W of panel in summer but **~7.7 W in NEPA winter overcast**, and a 2000 mAh
+   LiPo carries only ~1 day without sun. The failure mode is the bad one: a multi-day
+   overcast stretch is when rain-on-snow floods happen (spec §1), so the node browns out in
+   the conditions it exists for. Resolve by either duty-cycling the radar on a switched
+   5 V rail (~40 % saving, needs a load switch + GPIO + 100 ms settle before the Modbus
+   read) or oversizing panel and cell for winter. Measure the C6 figure on the bench first
+   — it is the soft number in the estimate. See `esphome/README.md`.

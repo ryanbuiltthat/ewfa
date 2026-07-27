@@ -114,11 +114,53 @@ Also worth doing before the mount: the open question #6 WiFi bag test at the pol
 location, since `power_save_mode: LIGHT` is a solar-budget compromise that a marginal link
 will not tolerate.
 
-## Power
+## Power budget
 
-Continuous operation — no deep sleep. A flood-warning node that is asleep during the rise
-is not a flood-warning node, and the adaptive fast mode exists precisely so the sampling
-rate rises when it matters. The radar's ~30 mA is the dominant draw. If the solar budget
-turns out not to cover 24/7 operation, the next thing to try is powering the radar through
-a switched rail between reads rather than sleeping the node — the node needs to stay on the
-network to be trusted.
+Worked per the EE skill's §4.1 method. **Assumptions are stated because one of them is
+soft** — the C6 figure is the estimate, and it is worth measuring on the bench rather than
+trusting.
+
+| | |
+|---|---|
+| SEN0676 | 30 mA (datasheet), ~35 mA drawn from the LiPo through an 85 %-efficient boost |
+| ESP32-C6 | ~45 mA, WiFi connected with `power_save_mode: LIGHT` — **estimate** |
+| **Average** | **~80 mA continuous** → **1.93 Ah/day** |
+
+Battery-only endurance, no sun:
+
+| LiPo | Runtime |
+|---|---|
+| 2000 mAh | ~1.0 day |
+| 3500 mAh | ~1.8 days |
+| 6000 mAh | ~3.1 days |
+| 10000 mAh | ~5.2 days |
+
+Panel needed to break even:
+
+| Season | Peak sun hours | Panel |
+|---|---|---|
+| Summer | 4.5 | ~2.6 W |
+| NEPA winter overcast | 1.5 | **~7.7 W** |
+
+**Winter is the binding case, and that is the problem.** A multi-day overcast stretch is
+exactly when rain-on-snow happens — the major regional flood driver per spec §1 — so the
+naive sizing fails in precisely the conditions the node exists for. A 2000 mAh cell and a
+small panel will brown out mid-event.
+
+Two ways out, and they are not equivalent:
+
+1. **Duty-cycle the radar on a switched rail** (recommended). It only needs to be powered
+   for the measurement itself. At 60 s polling with a ~1 s on-time, its contribution falls
+   from ~35 mA to well under 1 mA — a ~40 % cut in total draw. Needs a MOSFET or load
+   switch on the 5 V rail, a GPIO to drive it, and a settle delay before the Modbus read
+   (the datasheet quotes 100 ms startup). Not implemented: it changes the wiring, and
+   there is no hardware to test it against yet.
+2. **Oversize the panel and cell** to carry winter. Simpler, no firmware change, but
+   ~8 W of panel on a creekside pole is a much bigger physical object to mount and
+   guy-wire than the current design assumes.
+
+Deep sleep is deliberately not on that list. A flood-warning node asleep during the rise
+is not a flood-warning node, and the adaptive fast mode exists precisely so sampling rises
+when it matters. The C6's ~45 mA network presence is the floor this design accepts.
+
+Tracked as open question #11.

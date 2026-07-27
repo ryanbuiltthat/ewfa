@@ -1,0 +1,77 @@
+name: esphome
+
+# The creek node's config and its lambdas are never exercised by the Python test suite —
+# those tests read the YAML as data. Only ESPHome's own validator and the C++ compiler can
+# tell us the config is real, and neither runs on the machine the firmware was written on.
+# This is where that happens.
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "esphome/**"
+      - ".github/workflows/esphome.yml"
+  pull_request:
+    paths:
+      - "esphome/**"
+      - ".github/workflows/esphome.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install ESPHome
+        # Unpinned: ESP32-C6 needs 2024.6+, and pinning an old release to be "safe" would
+        # silently stop testing against the version anyone actually flashes with.
+        run: pip install esphome
+
+      # PlatformIO downloads the whole ESP-IDF toolchain on the first compile. Without a
+      # cache that is several minutes on every run, which is how a compile job quietly
+      # stops being run.
+      - name: Cache PlatformIO toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('esphome/creek_node.yaml') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Generate CI secrets
+        # esphome/secrets.yaml is gitignored (spec §8). These values only have to satisfy
+        # the schema — nothing here connects to anything. The API key must be real base64
+        # 32 bytes or validation rejects it.
+        run: |
+          cat > esphome/secrets.yaml <<EOF
+          wifi_ssid: "ci-ssid"
+          wifi_password: "ci-wifi-password"
+          ap_password: "ci-fallback-password"
+          api_encryption_key: "$(openssl rand -base64 32)"
+          ota_password: "ci-ota-password"
+          EOF
+
+      - name: Validate config
+        # Schema, substitutions, pin assignments, component options. Fast, and catches
+        # everything short of the C++.
+        run: esphome config esphome/creek_node.yaml
+
+      - name: Compile firmware
+        # The one that matters. The stage conversion, the rate-of-rise maths and the
+        # adaptive poll retuning are all lambdas — C++ that no amount of YAML checking
+        # looks at. If `id(radar).stop_poller()` is the wrong call form, this is what says
+        # so, and it is the reason this job exists at all.
+        run: esphome compile esphome/creek_node.yaml
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: creek-node-firmware
+          path: .esphome/build/creek/.pioenvs/creek/firmware.bin
+          if-no-files-found: warn
