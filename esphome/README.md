@@ -199,6 +199,32 @@ real:
    will drag cells into deep discharge and ruin them, which converts "node is down" into
    "pack is scrap, discovered in March." With one, going flat is survivable.
 
+### Selected power parts
+
+Settled after working the budget; see open questions #11–12 for the reasoning.
+
+| Role | Part | Why |
+|---|---|---|
+| Panel | 6 V, 7 W | Covers Mar–Nov; only early Dec is marginal |
+| Charger | CN3791-class 1S MPPT, **or** Waveshare Solar Power Manager **only if the `<2 mA` variant** | MPPT beats the linear bq24074's 67 %. Waveshare adds over-discharge protection but is spec'd at 78 % and some variants idle at 30–80 mA, which exceeds this node's whole budget |
+| Pack | 4P–6P 18650, 1S | On hand; more usable energy at 0 °C than an SLA twice the weight |
+| Pack protection | Low-voltage cutoff (board, or the charger's own) | Separates "node down" from "pack scrap" |
+| Radar rail | **Pololu U1V11F5** (5 V step-up, product 2562) | **True shutdown**: SHDN low disconnects the load rather than leaking input through, so it *is* the duty-cycle switch. <100 µA off, <1 mA running |
+| C6 rail | **Pololu U1V11F3** (3.3 V step-up, product 2561) | Boosts below 3.3 V and linearly down-regulates above, so it holds 3.3 V across the whole 1S range |
+
+**Two independent rails off the pack**, not one 5 V rail feeding both — the C6 must stay
+awake to turn the radar back on, so it cannot sit downstream of the radar's switch.
+
+Feeding the devkit 5 V and letting its onboard LDO drop to 3.3 V is ~56 % end-to-end
+(72 mA from the pack for a 45 mA load). Driving the 3V3 pin from a U1V11F3 is 79–89 %
+(45–51 mA). That is ~27 mA of pure heat avoided on the budget's largest single load.
+
+**Not a fit, checked and rejected:** Pololu U5Z6F12 / TI UCC33420 (product 5759). It is a
+*galvanically isolated* 12 V step-up — 4.5–5.5 V input (a 1S pack never reaches it), ~50 %
+efficiency by Pololu's own spec, and quiescent that rises to ~100 mA below its input range,
+which is exactly where a Li-ion pack sits. The 820 V isolation is for breaking ground loops;
+here the radar shares a ground with the C6 two inches away.
+
 ### Chemistry: does another battery type solve the cold-charge problem?
 
 | | Charges below 0 °C? | Verdict |
