@@ -32,12 +32,19 @@ resolution as each is answered.
 10. Rain-on-snow thresholds (`app/features.py`: 0.20 in SWE, 34 °F) are placeholders, and
    the flag cannot be validated until a winter rain-on-snow event is actually captured.
 
-11. Solar/battery sizing for the creek node. The firmware draws ~80 mA continuously
-   (~1.93 Ah/day): SEN0676 at 30 mA plus the C6 at an estimated ~45 mA with WiFi up. That
-   needs ~2.6 W of panel in summer but **~7.7 W in NEPA winter overcast**, and a 2000 mAh
-   LiPo carries only ~1 day without sun. The failure mode is the bad one: a multi-day
-   overcast stretch is when rain-on-snow floods happen (spec §1), so the node browns out in
-   the conditions it exists for. Resolve by either duty-cycling the radar on a switched
-   5 V rail (~40 % saving, needs a load switch + GPIO + 100 ms settle before the Modbus
-   read) or oversizing panel and cell for winter. Measure the C6 figure on the bench first
-   — it is the soft number in the estimate. See `esphome/README.md`.
+11. Solar/battery sizing for the creek node — **largely resolved, one item open.** The
+   firmware draws ~80 mA continuously (1.92 Ah/day = 7.1 Wh/day). Scoped to the stated
+   flood season (early spring → mid-December) rather than year-round, a **7 W panel** covers
+   March–November and is marginal only in early December, and only on a linear charger —
+   an MPPT/buck charger closes that gap and is worth more than extra panel area, since a
+   linear charger burns a third of the harvest as heat going 6 V → 4 V.
+   **The binding constraint is not sunlight, it is temperature:** Li-ion must never be
+   charged below 0 °C (lithium plating — permanent damage, then internal shorts), so the
+   pack has to carry the longest *sub-freezing* stretch, during which the panel
+   contributes nothing. That points at a **6P–8P 18650 pack** (5.6–7.5 days of cold
+   autonomy); 4P looks fine at room temperature and gives under four days cold.
+   **Still open:** (a) confirm the Adafruit charger board exposes the bq24074 NTC input
+   rather than tying it off, and bond a 10 kΩ NTC to a cell body; (b) measure the C6's
+   actual draw on the bench — it is an estimate and ~56 % of the budget; (c) run PVWatts
+   for the real pole location, where tree shading will dominate all of the above.
+   See `esphome/README.md`.

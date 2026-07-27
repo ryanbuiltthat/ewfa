@@ -116,51 +116,99 @@ will not tolerate.
 
 ## Power budget
 
-Worked per the EE skill's §4.1 method. **Assumptions are stated because one of them is
-soft** — the C6 figure is the estimate, and it is worth measuring on the bench rather than
-trusting.
+Worked per the EE skill's §4.1 method, sized for the **early-spring to mid-December**
+flood season rather than year-round. **One assumption is soft:** the C6 figure is an
+estimate and is ~56 % of the total — measure it on the bench before buying anything.
 
 | | |
 |---|---|
-| SEN0676 | 30 mA (datasheet), ~35 mA drawn from the LiPo through an 85 %-efficient boost |
-| ESP32-C6 | ~45 mA, WiFi connected with `power_save_mode: LIGHT` — **estimate** |
-| **Average** | **~80 mA continuous** → **1.93 Ah/day** |
+| SEN0676 | 30 mA (datasheet), ~35 mA from the cell through an 85 %-efficient boost |
+| ESP32-C6 | ~45 mA, WiFi up with `power_save_mode: LIGHT` — **estimate** |
+| **Average** | **~80 mA** → **1.92 Ah/day = 7.1 Wh/day** at 3.7 V |
 
-Battery-only endurance, no sun:
+### A 7 W panel covers the season
 
-| LiPo | Runtime |
-|---|---|
-| 2000 mAh | ~1.0 day |
-| 3500 mAh | ~1.8 days |
-| 6000 mAh | ~3.1 days |
-| 10000 mAh | ~5.2 days |
+Assuming 0.75 derate (dirt, angle, temperature, non-STC light) → 5.25 W effective.
 
-Panel needed to break even:
-
-| Season | Peak sun hours | Panel |
+| Charger | Efficiency | Needs |
 |---|---|---|
-| Summer | 4.5 | ~2.6 W |
-| NEPA winter overcast | 1.5 | **~7.7 W** |
+| Linear (bq24074-class, 6 V panel → 4 V cell) | ~67 % | **2.0 peak-sun-hours/day** |
+| MPPT / buck | ~90 % | **1.5 peak-sun-hours/day** |
 
-**Winter is the binding case, and that is the problem.** A multi-day overcast stretch is
-exactly when rain-on-snow happens — the major regional flood driver per spec §1 — so the
-naive sizing fails in precisely the conditions the node exists for. A 2000 mAh cell and a
-small panel will brown out mid-event.
+Approximate NEPA (41.5 °N) peak-sun-hours on a steep, winter-friendly tilt — **check
+PVWatts for the actual site before committing**, since tree shading at a creekside pole
+will matter more than any of this:
 
-Two ways out, and they are not equivalent:
+| | Mar | Apr–Aug | Sep | Oct | Nov | early Dec |
+|---|---|---|---|---|---|---|
+| PSH | 3.3 | 4.0–4.8 | 3.9 | 3.0 | 2.3 | 1.9 |
+| Linear charger | ok | ok | ok | ok | ok | **short** |
+| MPPT | ok | ok | ok | ok | ok | ok |
 
-1. **Duty-cycle the radar on a switched rail** (recommended). It only needs to be powered
-   for the measurement itself. At 60 s polling with a ~1 s on-time, its contribution falls
-   from ~35 mA to well under 1 mA — a ~40 % cut in total draw. Needs a MOSFET or load
-   switch on the 5 V rail, a GPIO to drive it, and a settle delay before the Modbus read
-   (the datasheet quotes 100 ms startup). Not implemented: it changes the wiring, and
-   there is no hardware to test it against yet.
-2. **Oversize the panel and cell** to carry winter. Simpler, no firmware change, but
-   ~8 W of panel on a creekside pole is a much bigger physical object to mount and
-   guy-wire than the current design assumes.
+So 7 W is comfortable March through November and marginal in the first half of December,
+*only* on a linear charger. **The charger topology is worth more than another 2 W of
+panel** — a linear charger burns the panel-to-cell voltage difference as heat, and at
+6 V → 4 V that is a third of the harvest. An MPPT or buck charger removes the December
+gap outright.
 
-Deep sleep is deliberately not on that list. A flood-warning node asleep during the rise
-is not a flood-warning node, and the adaptive fast mode exists precisely so sampling rises
-when it matters. The C6's ~45 mA network presence is the floor this design accepts.
+### Sub-freezing charging is the real constraint
+
+**Lithium-ion must not be charged below 0 °C.** Doing so plates metallic lithium on the
+anode: permanent capacity loss, and eventually internal shorts. This is not a derating —
+it is a damage-and-safety limit, and it applies to every 18650 regardless of brand.
+
+The season runs to mid-December and starts in early spring, so sub-freezing days are
+routine at both ends. That means:
+
+- **Use the charger's NTC/thermistor input** (the bq24074 has one — verify the specific
+  Adafruit board exposes it rather than tying it off) with a 10 kΩ NTC bonded to the pack,
+  not to the enclosure air. It suspends charging outside the safe window automatically.
+- **Discharging cold is fine** — down to about −20 °C, at reduced capacity. Only charging
+  is prohibited.
+- Therefore the pack must carry the **longest sub-freezing stretch**, not merely the
+  longest overcast one. In NEPA a week below freezing in December is unremarkable, and
+  during it the panel contributes nothing no matter how big it is.
+
+That is what sets pack size.
+
+### Pack sizing (1S × P, ~3000 mAh cells)
+
+Usable capacity taken as 80 % to protect cycle life. The cold column is the one that
+matters, since the no-charge window is by definition cold:
+
+| Pack | Capacity | Autonomy @ 20 °C | Autonomy @ 0 °C |
+|---|---|---|---|
+| 4P | 12 Ah | 5.0 days | 3.8 days |
+| **6P** | **18 Ah** | **7.5 days** | **5.6 days** |
+| **8P** | **24 Ah** | **10.0 days** | **7.5 days** |
+| 10P | 30 Ah | 12.5 days | 9.4 days |
+
+**6P–8P is the sensible build.** 4P looks adequate at room temperature and is not: it
+gives under four days in exactly the conditions where charging is also unavailable.
+
+### If you build the pack
+
+- **Match cells before welding.** Same capacity grade, and charge them all to within
+  ~0.05 V of each other first. In parallel a mismatched cell is charged by its neighbours
+  through the nickel, which is exactly the uncontrolled current path spot-welding makes
+  permanent.
+- **Fuse each cell** with a narrowed nickel link to the bus. A single internal short in one
+  of eight paralleled cells otherwise has the other seven dumping into it.
+- **NTC bonded to a cell body**, mid-pack, not floating in the enclosure — air temperature
+  will read above freezing long before the cells do.
+- Salvaged cells: capacity-test before committing. A pack is only as good as its worst
+  parallel member, and the whole point here is multi-day autonomy.
+
+### Duty-cycling the radar — now optional
+
+Switching the SEN0676's 5 V rail between reads cuts its contribution from ~35 mA to under
+1 mA — total draw ~48 mA, roughly a 40 % saving. With a 7 W panel and a 6P+ pack that is no
+longer needed for the energy balance. It remains attractive for one reason: it stretches
+the sub-freezing no-charge window by the same 40 %, turning 8P's 7.5 cold days into ~12.
+Needs a load switch, a GPIO, and a settle delay before the Modbus read (datasheet: 100 ms
+startup). Not implemented — no hardware to test against.
+
+Deep sleep is still excluded. A flood-warning node asleep during the rise is not a
+flood-warning node.
 
 Tracked as open question #11.
