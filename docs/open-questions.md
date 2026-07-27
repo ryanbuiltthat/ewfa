@@ -51,3 +51,20 @@ resolution as each is answered.
    **Still open:** confirm the Adafruit board exposes the bq24074 NTC input; measure the
    C6's real draw (an estimate, ~56 % of the budget); PVWatts the actual pole, where tree
    shading will dominate. See `esphome/README.md`.
+
+12. Charger and regulator selection for the creek node (spun out of #11).
+   **Chemistry change does not fix cold charging.** LiFePO4 has the same 0 °C charge
+   prohibition as Li-ion; NiMH is marginal and brings unreliable −ΔV termination at solar
+   currents. Lead-acid genuinely charges to about −20 °C, but a *flat* lead-acid freezes at
+   −8 °C and splits its case, it stores less usable energy at 0 °C than the 18650s already
+   on hand, and it weighs ~2.5 kg on a guy-wired pole.
+   **The controller is the trap.** 12 V MPPT controllers idle at 10–18 mA — 12–37 % of this
+   node's budget — so going lead-acid would spend a fifth of the power the exercise is
+   meant to save. PWM controllers throw away ~28 % clamping an 18 V Vmp panel to 13 V.
+   **Decision: keep Li-ion, replace the charger.** A CN3791-class 1S MPPT module (~0.5 mA
+   idle) recovers the third the linear bq24074 burns going 6 V → 4 V and closes the
+   December gap. Pair with 4P–6P 18650 and low-voltage protection. Choose the 5 V boost
+   with an enable pin — that EN line is the radar load switch, so duty-cycling costs a GPIO
+   and a 100 ms settle rather than a separate MOSFET.
+   **OTA over winter:** bring the node indoors with the pack; on USB it stays on WiFi and
+   takes updates normally. Winter is when firmware iteration happens anyway.

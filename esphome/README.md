@@ -199,6 +199,67 @@ real:
    will drag cells into deep discharge and ruin them, which converts "node is down" into
    "pack is scrap, discovered in March." With one, going flat is survivable.
 
+### Chemistry: does another battery type solve the cold-charge problem?
+
+| | Charges below 0 °C? | Verdict |
+|---|---|---|
+| Li-ion (18650) | **No** — lithium plating | Current plan; needs NTC cutoff |
+| **LiFePO4** | **No** — same 0 °C limit | **Does not help.** The common assumption that LFP fixes this is wrong; it buys cycle life and safety, not cold charging |
+| **NiMH** | Marginally — most datasheets also say 0–45 °C, some allow C/20 trickle lower | **Not worth it.** Tolerates trickle overcharge, which suits solar, but −ΔV termination is unreliable at solar currents, self-discharge is worse, and the cell stack voltage is awkward |
+| **Lead-acid (AGM)** | **Yes** — to about −20 °C with temperature-compensated voltage | **Genuinely solves it**, with two catches below |
+
+**Lead-acid's own winter trap:** a *discharged* lead-acid battery freezes. Electrolyte
+freeze point tracks state of charge — −24 °C at the 50 % DoD floor, but **−8 °C when flat,
+at which point the case splits.** So it still needs low-voltage disconnect, and its failure
+mode is worse than Li-ion's: a ruined battery and spilled acid rather than a degraded pack.
+It is also ~2.5 kg for *less* usable energy than the 18650s already on hand:
+
+| Pack | Usable @ 0 °C | Days @ 80 mA | Days @ 48 mA |
+|---|---|---|---|
+| 18650 6P (18 Ah) | 67 Wh | 9.4 | 15.5 |
+| SLA 12V 7Ah | 34 Wh | 4.7 | 7.8 |
+| SLA 12V 12Ah | 58 Wh | 8.1 | 13.4 |
+
+### The controller is the real trap, not the chemistry
+
+Going lead-acid means adopting a 12 V charge controller, and at this scale their idle draw
+is not a rounding error:
+
+| Controller | Quiescent | Share of an 80 mA budget | Of a 48 mA budget |
+|---|---|---|---|
+| CN3791 1S Li MPPT module | ~0.5 mA | 0.6 % | 1.0 % |
+| Genasun GV-4 | ~1 mA | 1.2 % | 2.1 % |
+| Victron SmartSolar 75/10 | ~10 mA | **12.5 %** | **20.8 %** |
+| EPEver Tracer AN | ~18 mA | **22.5 %** | **37.5 %** |
+
+A good 12 V controller would eat a fifth of the power the whole exercise is trying to save.
+**Also avoid PWM controllers**: with a nominal-12 V panel (Vmp ~18 V) clamped to a 13 V
+battery they throw away ~28 %, which is the same mistake as the linear charger.
+
+### Recommendation: keep Li-ion, change the charger
+
+The chemistry is not the problem. The charger is.
+
+1. **Replace the linear bq24074 with a CN3791-class 1S MPPT** (6 V panel input). Recovers
+   the third burned going 6 V → 4 V, closes the December gap, and draws ~0.5 mA idle.
+2. **4P–6P of 18650** — free, already on hand, and more usable energy than an SLA twice its
+   weight on a guy-wired pole.
+3. **Low-voltage protection.** Required for either chemistry.
+4. **Pick the 5 V boost with an enable pin.** That EN line *is* the radar load switch —
+   duty-cycling then costs a GPIO and a 100 ms settle, with no separate MOSFET. Choose a
+   boost with genuine shutdown (µA-level) rather than one that idles at mA.
+
+### OTA over winter is a solved problem
+
+The one real objection to pulling the pack in December is losing OTA. It costs nothing to
+fix: **bring the node indoors with the pack.** On USB at a desk it stays on WiFi, takes OTA
+updates normally, and is available for bench work — and winter is when firmware iteration
+would happen anyway, since there is nothing to measure on a frozen creek. Reinstall in
+February with current firmware.
+
+That makes the winter shutdown the cheap path and unattended winter operation an optional
+upgrade, rather than the other way round.
+
 ### Pack sizing (1S × P, ~3000 mAh cells)
 
 With the load duty-cycled, **4P–6P is plenty** — the earlier 8P–10P recommendation was
