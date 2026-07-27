@@ -1,5 +1,7 @@
 # Creek Flood Early-Warning System
 
+[![tests](https://github.com/ryanbuiltthat/ewfa/actions/workflows/tests.yml/badge.svg)](https://github.com/ryanbuiltthat/ewfa/actions/workflows/tests.yml)
+
 A DIY flood early-warning system for a property mid-watershed on Ackerly Creek (Lackawanna County, PA) — built on Home Assistant, ESPHome, and a radar-based stream gauge, with a roadmap toward predictive flood-probability modeling.
 
 There is no official USGS gauge on this creek. This project instruments the creek directly and fuses that reading with upstream rainfall, soil saturation, forecast precipitation, and National Water Model data to give advance warning before water rises — motivated by a prior basement flood at the property.
@@ -14,11 +16,12 @@ There is no official USGS gauge on this creek. This project instruments the cree
 ## Repo structure
 
 ```
-esphome/          ESPHome firmware config for the creek sensor node
+esphome/          ESPHome firmware config for the creek sensor node (not built yet)
 ha-packages/      Home Assistant package YAML (sensors, templates, automations)
 dashboards/       Lovelace dashboards (flood-watch + operator console)
 creek_modeling/   HA add-on: nightly dataset builder + prediction service
 docs/             Project docs, including open questions and decisions log
+.github/          CI: runs the add-on test suite on every push
 repository.yaml   Marks the repo as an installable HA add-on store
 creek-flood-warning-spec.md   Source-of-truth project specification
 ```
