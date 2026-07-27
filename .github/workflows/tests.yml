@@ -51,12 +51,19 @@ jobs:
         run: |
           python - <<'PY'
           import sys, pathlib, yaml
+
+          class Loader(yaml.SafeLoader):
+              """ESPHome configs carry tags SafeLoader rejects (!secret, !lambda). We are
+              checking that the document is well-formed YAML, not resolving the tags."""
+          Loader.add_multi_constructor("!", lambda l, suffix, node: None)
+
           bad = []
           for p in ["creek_modeling/config.yaml", "creek_modeling/build.yaml",
                     "repository.yaml", "dashboards/creek_flood_watch.yaml",
-                    "ha-packages/creek_warning.yaml", ".github/workflows/tests.yml"]:
+                    "ha-packages/creek_warning.yaml", ".github/workflows/tests.yml",
+                    "esphome/creek_node.yaml"]:
               try:
-                  yaml.safe_load(pathlib.Path(p).read_text(encoding="utf-8"))
+                  yaml.load(pathlib.Path(p).read_text(encoding="utf-8"), Loader=Loader)
                   print("ok  ", p)
               except Exception as exc:
                   bad.append(f"{p}: {exc}")

@@ -116,7 +116,12 @@ Each tier maps to escalating HA actions (notification → persistent alarm → w
 ## 7. Phases & Deliverables
 
 **Phase 1 — Instrument (weekend 1–2):**
-ESPHome YAML for creek node (SEN0676 Modbus, power telemetry, adaptive reporting); pole/arm install per §2 geometry; ~~WH51 probes into Ecowitt~~ **done (×2 installed)**; verify long-term statistics recording in HA.
+~~ESPHome YAML for creek node (SEN0676 Modbus, power telemetry, adaptive reporting)~~
+**done** (`esphome/creek_node.yaml` — reads the raw distance register and converts to stage
+on the node, so the datum stays a re-settable HA number while open question #5 is open;
+adaptive 60 s → 5 s on rate-of-rise, held 10 min. **Written against the datasheet and never
+run on hardware** — `esphome/README.md` carries the bench-test procedure, which must come
+before the pole install); pole/arm install per §2 geometry; ~~WH51 probes into Ecowitt~~ **done (×2 installed)**; verify long-term statistics recording in HA.
 
 - **Follow-up:** Confirm WH51 entities appear in HA via the Ecowitt integration and are captured in recorder long-term statistics (check `state_class`); these feed the nightly dataset builder.
 

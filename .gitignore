@@ -427,3 +427,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ESPHome node secrets (spec §8: secrets never committed)
+esphome/secrets.yaml
