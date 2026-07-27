@@ -227,6 +227,42 @@ efficiency by Pololu's own spec, and quiescent that rises to ~100 mA below its i
 which is exactly where a Li-ion pack sits. The 820 V isolation is for breaking ground loops;
 here the radar shares a ground with the C6 two inches away.
 
+### Sub-freezing charge cutoff
+
+**KSD9700 bimetallic thermal switch, 5 °C, normally-open**, in the **panel positive line**
+upstream of the charger. Chosen over an NTC-plus-comparator because it draws nothing at
+all and has no electronics to fail; chosen over a charger with a JEITA/NTC input because
+the CN3791 appears not to have one.
+
+Switching the panel rather than the battery line leaves the discharge path untouched, so a
+failed-open switch costs charging — visible as a declining battery in HA — rather than
+killing the load.
+
+5 °C rather than 0 °C is deliberate: it covers the lag between enclosure air and cell
+temperature plus the switch's own tolerance.
+
+**Bench-test before wiring — two things, one of them safety-critical:**
+
+1. **Direction.** Standard KSD9700 N/O closes on *rising* temperature, so 5 °C N/O should
+   be open below 5 °C and closed above. Budget sellers label low-temperature variants
+   inconsistently, and inverted is worse than absent — a circuit that charges *only* when
+   freezing. Multimeter on continuity, switch in the freezer: cold must read **open**;
+   warming in the hand must **close** it with a click.
+2. **Reset differential.** Unpublished, and it runs 5–15 °C across KSD9700 parts. A 10 °C
+   differential means a switch that closed at 5 °C stays closed down to −5 °C on the way
+   back down — permitting exactly what it was installed to prevent. Same test: note the
+   temperature it closes at while warming, and the temperature it opens at while cooling.
+   If it opens below 0 °C, move to the 10 °C variant.
+
+   Mitigating, so measure but do not panic: plating risk scales with charge *current*, and
+   the window where the differential bites — cold, falling, low sun angle — is when the
+   panel is delivering almost nothing anyway. Trickle below freezing is far gentler than
+   bulk charging there.
+
+**Mounting:** bond the flat metal face to a **cell body, mid-pack**, with thermal tape or
+paste. Enclosure air reads above freezing hours before the cells do. The 5 A / 250 V rating
+is vast against ~1.2 A at 7 V, and there is no DC arcing concern at that voltage.
+
 ### Chemistry: does another battery type solve the cold-charge problem?
 
 | | Charges below 0 °C? | Verdict |

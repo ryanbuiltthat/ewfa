@@ -68,3 +68,17 @@ resolution as each is answered.
    and a 100 ms settle rather than a separate MOSFET.
    **OTA over winter:** bring the node indoors with the pack; on USB it stays on WiFi and
    takes updates normally. Winter is when firmware iteration happens anyway.
+
+13. Sub-freezing charge cutoff — **approach settled, two measurements outstanding.**
+   A KSD9700 5 °C normally-open bimetallic switch in the panel positive line, upstream of
+   the charger. Zero quiescent, no electronics, and switching the panel rather than the
+   battery keeps the discharge path intact so a failed-open switch only costs charging.
+   Deliberately not done with the ESP32: the MCU is powered by the pack it would protect,
+   so fail-open leaves a cold pack charging and fail-closed means a flat pack can never
+   recover — the MCU cannot boot to enable the charging that would let it boot.
+   **Outstanding:** (a) confirm the switch opens when cold and closes when warm — budget
+   sellers mislabel low-temperature N/O parts, and inverted is worse than absent; (b)
+   measure the reset differential, unpublished and 5–15 °C across KSD9700 parts, since a
+   10 °C differential would hold the contacts closed to −5 °C after closing at 5 °C. Move
+   to the 10 °C variant if it opens below 0 °C. Both are one freezer test with a
+   multimeter. See `esphome/README.md`.
