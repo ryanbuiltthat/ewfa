@@ -243,6 +243,21 @@ The chemistry is not the problem. The charger is.
 
 1. **Replace the linear bq24074 with a CN3791-class 1S MPPT** (6 V panel input). Recovers
    the third burned going 6 V → 4 V, closes the December gap, and draws ~0.5 mA idle.
+   **Check the connectors before wiring.** On most CN3791 boards the two JSTs are
+   solar-in and battery-out, not two panel inputs — a panel into the battery connector
+   destroys the module. Confirm with the silkscreen, or meter them: the battery JST reads
+   pack voltage with the panel unplugged.
+   **One panel is enough.** 7 W with MPPT already covers the season, so a second adds area
+   the budget does not need. The one case that justifies two is *shading diversity* — a
+   creekside pole under a cherry tree is a partial-shade site, and shade moves across the
+   day rather than scaling with area, so two panels aimed differently (SE/SW) beat one
+   larger panel aimed one way. Side by side facing the same direction is strictly worse
+   than a single panel of the same total area. If paralleling: identical panels (one MPPT
+   input finds one operating point, wrong for both if mismatched), a Schottky blocking
+   diode per panel (otherwise a shaded panel loads the lit one), and check the board's
+   sense-resistor charge limit against the combined current.
+   Decide this from data, not up front: the node reports battery voltage and level, so a
+   couple of weeks of logs will show whether the site is shade-limited or area-limited.
 2. **4P–6P of 18650** — free, already on hand, and more usable energy than an SLA twice its
    weight on a guy-wired pole.
 3. **Low-voltage protection.** Required for either chemistry.
