@@ -13,6 +13,7 @@ add-on reads and what unlocks alert tiers 3–4.
 |---|---|
 | `creek_node.yaml` | The node config. Tunables are all in `substitutions:` at the top. |
 | `secrets.yaml.example` | Copy to `secrets.yaml` (gitignored) and fill in. |
+| `wiring-prompt.md` | Full connection table for the bench build, doubling as a self-contained prompt for generating a Fritzing-style diagram. |
 
 ## Wiring
 
