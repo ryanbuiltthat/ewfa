@@ -142,7 +142,19 @@ estimate stays a USGS-proxy number until the SEN0676 is mounted, and the thresho
 throughout stay uncalibrated until the storm log has entries to fit against.
 
 **Phase 4 — Predict (after ~10 events):**
-Fast-loop inference service; model registry + nightly retrain; tier logic upgraded from thresholds to probability; skill dashboard (lead time achieved, false alarm rate).
+~~Fast-loop inference service~~ **done** (`app/model.py`, gated by `min_events_for_ml`);
+~~model registry~~ **done** (`app/registry.py`); ~~nightly retrain~~ **done**
+(`app/train.py`, gradient boosting — see Addendum D); tier logic upgraded from thresholds
+to probability **partially done** — `tiers.py`'s Watch/Warning rules already read
+`flood_probability` when it is available, they just have not had a real one to read yet;
+skill dashboard (lead time achieved, false alarm rate) **done**, published in
+`registry.snapshot()`'s `active_metrics`/`candidate_metrics` and shown on the Operator tab.
+
+The pipeline is code-complete and unit-tested against synthetic storms (Addendum D), and
+has never seen real data: `min_events_for_ml` gates it on ~10 captured storms, and even
+past that gate it needs `stage_ft` or `rate_of_rise_in_min` to actually cross Warning at
+least twice to have anything to learn — both are None until the SEN0676 exists. What
+Phase 4 needs, like Phase 3, is time, not code.
 
 **Phase 5 — Harden & polish:**
 Pressure-transducer redundancy + divergence alarm; creek camera; HACS integration with config flow; documentation/runbook.
@@ -358,8 +370,9 @@ Supervisor bind-mounts a per-add-on volume at `/data` that persists across resta
 ├── datasets/
 │   └── dataset.parquet          # nightly-appended feature/label rows (§4 batch)
 ├── models/
-│   ├── registry.json            # versioned artifacts + skill metrics (hit rate, FA, lead time)
-│   └── model-<version>.pkl      # promoted artifacts (§4 post-storm promotion)
+│   ├── registry.json                # versioned artifacts + skill metrics (hit rate, FA, lead time)
+│   ├── model-<version>.json         # promoted artifact (xgboost native format — Addendum D)
+│   └── model-<version>.meta.json    # feature column order + horizon, alongside it
 └── state/
     └── last_run.json            # fast-loop / nightly-batch bookkeeping
 ```
@@ -383,7 +396,7 @@ This satisfies §4's "append day's data to dataset (Parquet/SQLite), version mod
 ### A.8 Impact on phases
 
 - **Phase 2 (Ingest):** unchanged in scope; the add-on skeleton (`config.yaml`/`Dockerfile`/`run.sh` + a no-op fast loop that just logs) can be stood up here to validate the Supervisor proxy + MQTT wiring before any modeling exists.
-- **Phase 4 (Predict):** the fast-loop inference service and nightly retrain land inside this add-on; `min_events_for_ml` gates the threshold→ML transition (§5) via an option, no rebuild required.
+- **Phase 4 (Predict):** the fast-loop inference service and nightly retrain land inside this add-on; `min_events_for_ml` gates the threshold→ML transition (§5) via an option, no rebuild required. See Addendum D for what is actually built vs. what is still waiting on real storms.
 - **Build/CI:** local-add-on iteration needs no registry; when promoting to a Git add-on repo, reuse the existing ESPHome-fleet GitHub Actions pattern (§8) to lint (`config.yaml`) and build the image per push.
 
 ## Addendum B — Flood-watch dashboard + on-demand controls
@@ -517,3 +530,68 @@ antecedent soil moisture, Watch from upstream/on-site rain accumulation — both
 flowing. So the system issues real warnings during the wait for the SEN0676, while Warning
 and Emergency (stage, rate-of-rise) stay dormant until the creek node reports. Feeding these
 features into the *model* remains Phase 4, behind the same interfaces.
+
+## Addendum D — Model training pipeline (Phase 4)
+
+`app/train.py` implements §4/§5/§7's "recalibrate/retrain, version model artifact, log
+skill metrics". **Code-complete and unit-tested against synthetic storms
+(`tests/test_train.py`, `tests/test_model.py`); has never seen real data.** Two gates sit
+in front of it, both intentional:
+
+1. `min_events_for_ml` (§5) — `_nightly_batch` (`__main__.py`) does not call `train()` at
+   all below this many captured storms (`storms.count()`).
+2. Past that gate, `train()` refuses to fit if the label has fewer than
+   `MIN_POSITIVE_LABELS` positives. The label is "stage or rate-of-rise reaches Warning
+   within +3 h" (`tiers.WARNING_STAGE_FT` / `WARNING_RATE_OF_RISE_IN_MIN`, reused directly
+   rather than duplicated), and both of those are `None` until the SEN0676 is mounted — so
+   in the live system today this gate never opens, correctly. A classifier fit on zero
+   positive examples has learned "always predict no," which is a worse answer than the
+   threshold estimate with more confidence behind it, not a better one.
+
+### D.1 What is built
+
+- **Label:** forward-window Warning exceedance at a single **+3 h** horizon — the largest
+  of the three §5 asks for, kept alone because three untested horizons cost three times the
+  surface for no way to validate any of them before real storms exist.
+- **Model:** xgboost binary classifier (`binary:logistic`), chosen concretely because it
+  handles missing feature values natively — most rows have gaps today (Google Floods
+  unbuilt, WU needs both keys configured, stage/rate-of-rise always `None` pre-hardware),
+  and a hand-rolled model would need an imputation strategy invented for a missingness
+  pattern that is not yet known. `requirements.txt` already carries it for this
+  (Addendum A.2); the Dockerfile's `libgomp1` exists only to support it.
+- **Split:** chronological (most recent `TEST_FRACTION` by time, not row count), with an
+  embargo of one horizon-width on each side of the split so a storm straddling the boundary
+  cannot leak between train and test.
+- **Class imbalance:** `scale_pos_weight`, not resampling — flood events are rare by
+  construction (that is why storms take months to accumulate), and up-weighting costs
+  nothing extra to store or compute.
+- **Skill metrics** (§4/§7): hit rate (recall), false-alarm rate, ROC AUC, and mean lead
+  time — the gap between a correct positive prediction and the actual Warning-condition
+  onset it preceded, walked forward per row rather than assumed. Reported as `None` rather
+  than a misleading `0.0` when the test split lands single-class, which is the norm rather
+  than the exception at this stage.
+- **Serialization:** xgboost's native JSON (`Booster.save_model`) plus a `.meta.json`
+  sidecar for feature-column order, **not** the `.pkl` this doc originally specified (§4/A.7)
+  — deliberately: a pickle ties the artifact to the exact xgboost build that wrote it and
+  executes arbitrary code on load, which is a poor trade for a format with exactly one
+  consumer. `ModelRegistry` (`registry.py`) is untouched by any of this — it stores
+  version/metrics JSON only, exactly as designed ("testable without a broker, HA, or a
+  trained model"), and `train()` never writes to `active`, only `set_candidate`. Promoting a
+  candidate to active is the dashboard's **Promote** button, a human decision — §4's
+  "post-storm: manual review + model promotion step."
+- **Not built:** `predicted_crest_ft` (stage regression). With no creek gauge there has
+  never been a real `stage_ft` sample to regress against; building one now would exercise
+  library API surface, not model anything. Revisit once real stage data exists.
+
+### D.2 A gap this closed: promote/rollback now take effect live
+
+Before this addendum, `Model._load_promoted` was a stub that always returned nothing, so
+whether the dashboard's Promote/Rollback buttons would actually change live inference was
+never tested and, on inspection, would not have: `Model` loaded its artifact once at
+construction, while `_promote`/`_rollback` (`__main__.py`) only ever mutate the shared
+`ModelRegistry` — a promotion would have silently done nothing until the add-on restarted.
+`Model` now re-checks `registry.active_version` on every `predict()` call (a cheap string
+compare) and reloads when it changes, so a promotion or rollback is live on its next fast
+loop, no restart required. Covered by `tests/test_model.py`, including the corrupted/missing
+artifact case: the registry naming a version does not guarantee the file behind it is
+loadable, and `Model` fails open to the threshold estimate rather than crashing the loop.

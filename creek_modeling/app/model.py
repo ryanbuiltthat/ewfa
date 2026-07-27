@@ -3,14 +3,21 @@
 Until >= `min_events_for_ml` storms are captured (spec §5), this returns a
 transparent, conservative *threshold* estimate rather than an ML prediction —
 early months are data-collection + threshold alerting only. The ML path
-(gradient boosting) slots into `_ml_predict` once the registry has a promoted
-artifact; the caller interface does not change.
+(`train.py`) slots in once the registry names a promoted artifact; the caller
+interface (`predict()` returning a `Prediction`) does not change either way, so
+nothing downstream needs to know which path answered.
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+
+from . import train as trainer
 from .config import Config
 from .features import FeatureRow
 from .registry import ModelRegistry
@@ -27,27 +34,57 @@ class Prediction:
 
 
 class Model:
-    def __init__(self, cfg: Config, registry: ModelRegistry):
+    def __init__(self, cfg: Config, registry: ModelRegistry, data_dir: Path):
         self._cfg = cfg
-        # Share the one registry instance the service owns, so a promote/rollback
-        # command is visible here on the next prediction without a reload race.
+        self._data_dir = data_dir
+        # Share the one registry instance the service owns: `_refresh` compares against
+        # its live active_version, so a promote/rollback command (which only ever
+        # touches the registry, never this object) is picked up on the next prediction
+        # rather than requiring the add-on to restart for a promotion to take effect.
         self._registry = registry
-        self._artifact = self._load_promoted()
+        self._loaded_version: str | None = None
+        self._booster = None
+        self._meta = None
+        self._refresh()
 
-    def _load_promoted(self):
-        """Load the promoted ML artifact if the registry names one; else None."""
+    def _refresh(self) -> None:
+        """(Re)load the artifact if the registry's active version has changed.
+
+        Cheap on the common path — one string comparison — so calling it from every
+        `predict()` costs nothing while a promote/rollback is rare. Falls back to the
+        threshold estimate (booster/meta left None) rather than raising when the
+        registry names a version whose files are missing or unreadable: a nightly job
+        or a hand-edited registry.json must not be able to take inference down.
+        """
         version = self._registry.active_version
+        if version == self._loaded_version:
+            return
         if not version:
-            return None
-        # Phase 4: actually load models/<version>.pkl here.
-        log.info("Registry active artifact %s (loading deferred to Phase 4)", version)
-        return None
+            self._booster, self._meta = None, None
+        else:
+            self._booster, self._meta = trainer.load_artifact(self._data_dir, version)
+            if self._booster is None:
+                log.warning("registry names active version %s but its artifact is "
+                           "missing/unreadable — falling back to the threshold estimate",
+                           version)
+        self._loaded_version = version
+
+    @property
+    def active_method(self) -> str:
+        """What `predict()` will actually do right now — "ml:<version>" or
+        "threshold". Exists so callers (model_health) report reality rather than
+        re-deriving the same gate `predict()` uses and risking the two disagreeing."""
+        self._refresh()
+        if self._booster is not None and self.event_count() >= self._cfg.min_events_for_ml:
+            return f"ml:{self._registry.active_version}"
+        return "threshold"
 
     def event_count(self) -> int:
         return self._registry.event_count
 
     def predict(self, row: FeatureRow) -> Prediction:
-        if self._artifact is not None and self.event_count() >= self._cfg.min_events_for_ml:
+        self._refresh()
+        if self._booster is not None and self.event_count() >= self._cfg.min_events_for_ml:
             return self._ml_predict(row)
         return self._threshold_predict(row)
 
@@ -72,5 +109,25 @@ class Model:
             method="threshold",
         )
 
-    def _ml_predict(self, row: FeatureRow) -> Prediction:  # pragma: no cover - Phase 4
-        raise NotImplementedError("Gradient-boosting inference lands in Phase 4.")
+    def _ml_predict(self, row: FeatureRow) -> Prediction:
+        """Run the promoted booster. `predicted_crest_ft` stays None here too —
+        see train.py's module docstring for why a stage regressor is not built."""
+        values = row.as_dict()
+        columns = self._meta["feature_columns"]
+        # A column the row does not carry, or one that is None (a source that has not
+        # answered yet — the common case, not the exception), becomes NaN rather than
+        # Python None: a single-row frame with any None column comes out `object` dtype,
+        # which xgboost's DMatrix rejects outright rather than treating as missing. Bool
+        # flags become 0/1 first, same as at training time (train.build_matrix).
+        row_dict = {}
+        for c in columns:
+            v = values.get(c)
+            row_dict[c] = float(v) if isinstance(v, bool) else (np.nan if v is None else v)
+        x = pd.DataFrame([row_dict], columns=columns).astype("float64")
+        p = float(self._booster.predict(xgb.DMatrix(x))[0])
+        return Prediction(
+            flood_probability=round(p, 3),
+            predicted_crest_ft=None,
+            lag_estimate_min=None,
+            method=f"ml:{self._registry.active_version}",
+        )

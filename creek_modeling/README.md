@@ -96,7 +96,10 @@ the SSH/Terminal add-on and over Samba. See [DOCS.md](./DOCS.md#persistent-stora
 Phase 2 **skeleton**: validates the Supervisor proxy + MQTT wiring, builds live
 features (stage, rate-of-rise, soil moisture + ponding flag), and returns a
 transparent conservative **threshold** estimate. Gradient-boosting inference and
-nightly retrain land in Phase 4 behind the same interfaces (`app/model.py`).
+nightly retrain (`app/train.py`) are built and unit-tested against synthetic storms, but
+have never seen real data — both `min_events_for_ml` and a minimum of real Warning-tier
+examples gate training, and the latter needs the SEN0676 to ever be nonzero. See spec
+Addendum D.
 
 ## Local dev (outside HAOS)
 

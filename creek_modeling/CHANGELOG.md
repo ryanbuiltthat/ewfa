@@ -3,6 +3,48 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.12.0
+
+- **Phase 4 training pipeline built** (`app/train.py`, spec Addendum D). Fits an xgboost
+  classifier predicting "Warning-tier exceedance within +3 h" from the live feature set,
+  on a chronological split with an embargo around the boundary so a storm straddling it
+  cannot leak between train and test, class-imbalance handled via `scale_pos_weight`
+  rather than resampling, and skill metrics (hit rate, false-alarm rate, ROC AUC, mean
+  lead time) computed on the held-out split. Wired into the nightly batch: gated first by
+  `min_events_for_ml` (unchanged), then by a minimum of positive examples in the label —
+  the label depends on `stage_ft`/`rate_of_rise_in_min`, which are `None` until the
+  SEN0676 exists, so in the live system today this second gate never opens. That is
+  correct, not a bug: a model fit on zero positive examples has learned "always predict
+  no," which is worse than the threshold estimate with more confidence attached.
+  **Code-complete and unit-tested against synthetic storms
+  (`tests/test_train.py`, `tests/test_model.py`); has never seen real data.**
+
+- **`Model` actually loads and runs the promoted artifact now** (`app/model.py`).
+  `_load_promoted` was a stub since Phase 2 ("loading deferred to Phase 4"); `_ml_predict`
+  raised `NotImplementedError`. Both are real. Serialization is xgboost's native JSON
+  format rather than the `.pkl` this repo's docs originally specified — a pickle ties the
+  artifact to the exact xgboost build that wrote it and executes arbitrary code on load,
+  a poor trade for a format with one consumer.
+
+- **Fixed: Promote/Rollback would have silently done nothing.** Implementing real loading
+  surfaced a gap that a stub couldn't: `Model` loaded its artifact once at construction,
+  while the dashboard's Promote/Rollback buttons only ever mutate the shared
+  `ModelRegistry` — a promotion would not have taken effect until the add-on restarted,
+  and nothing would have said so. `Model` now re-checks the registry's active version on
+  every prediction (one string compare) and reloads when it changes.
+
+- **Fixed a real crash caught by the new tests, not shipped:** building the single-row
+  frame for live inference from a `FeatureRow` with any `None` field produced an
+  `object`-dtype pandas column, which xgboost's `DMatrix` rejects outright rather than
+  treating as missing. Since most rows have at least one unconfigured/unanswered source,
+  this would have failed on close to the first real inference attempt once a model was
+  ever promoted. Fixed by coercing to float/NaN before handing off to xgboost.
+
+- `active_method` (published as `model_health.active_method`) is now read from `Model`
+  itself rather than re-derived from `events >= min_events_for_ml` in `__main__.py` — the
+  two could previously disagree (gate satisfied, no artifact actually loaded) and now
+  cannot, by construction.
+
 ## 0.11.8
 
 - `onsite_rain_rate_entity` **confirmed** as `sensor.outside_weather_station_rain_intensity`

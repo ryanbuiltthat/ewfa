@@ -31,6 +31,7 @@ from .mqtt_client import MqttClient
 from .registry import ModelRegistry
 from .storms import StormLog
 from .sources import FEATURE_KEYS, SourceCoordinator
+from . import train
 from .tiers import compute_tier
 
 log = logging.getLogger("app")
@@ -108,17 +109,40 @@ def _publish_lag(mqtt: MqttClient, lag: dict) -> None:
                                   "reason": lag["reason"]})
 
 
-def _publish_model_health(cfg: Config, mqtt: MqttClient, rows: int, events: int,
+def _publish_model_health(cfg: Config, mqtt: MqttClient, rows: int, model: Model,
                           ran_at: str | None) -> str:
-    method = "ml" if events >= cfg.min_events_for_ml else "threshold"
+    # Reports model.active_method rather than re-deriving "events >= gate" here, so a
+    # promoted version whose artifact failed to load (Model._load_promoted) shows up as
+    # "threshold" — what predict() will actually do — not as a method with nothing behind it.
+    method = model.active_method
     mqtt.publish("model_health", {
         "dataset_rows": rows,
-        "event_count": events,
+        "event_count": model.event_count(),
         "min_events_for_ml": cfg.min_events_for_ml,
         "active_method": method,
         "ran_at": ran_at,
     })
     return method
+
+
+def _retrain(cfg: Config, dataset: DatasetWriter, registry: ModelRegistry,
+            model: Model, data_dir) -> str:
+    """Fit a new candidate if the storm log has cleared the ML gate (spec §5).
+
+    Never touches `registry.active_*` — only `set_candidate`. Promoting a candidate to
+    active is the dashboard's Promote button (`ModelRegistry.promote`), a human decision
+    the spec calls "post-storm manual review", not something a nightly job does to itself.
+    """
+    if model.event_count() < cfg.min_events_for_ml:
+        return f"skipped (events={model.event_count()} < min_events_for_ml={cfg.min_events_for_ml})"
+    result = train.train(dataset.frame(), data_dir)
+    if result is None:
+        # Expected, not an error, until real storms give the label positive examples —
+        # see train.py's module docstring. The event count alone does not guarantee that;
+        # min_events_for_ml counts storms, not Warning-tier crossings within them.
+        return "no candidate produced (see log — commonly too few positive examples yet)"
+    registry.set_candidate(result.version, result.metrics)
+    return f"candidate {result.version} ready to promote: {result.metrics}"
 
 
 def _nightly_batch(
@@ -131,7 +155,6 @@ def _nightly_batch(
         # The storm log is the source of truth for the ML gate (§5).
         registry.set_event_count(storms.count())
         _publish_storms(mqtt, storms)
-    events = model.event_count()
 
     # First lag/response estimate (§7 Phase 3). Falls back to a downstream gauge while the
     # creek node is missing — that number is the sanity check, not Ackerly's lag.
@@ -139,15 +162,16 @@ def _nightly_batch(
     save_lag(DATA_DIR, lag)      # so a restart republishes it instead of showing unknown
     _publish_lag(mqtt, lag)
 
-    log.info("Nightly batch: dataset=%d rows, events=%d, lag=%s",
-             rows, events, lag["lag_minutes"])
-    # Phase 4: append day's data, recalibrate/retrain, version artifact via
-    # registry.set_candidate(version, metrics), log skill metrics.
+    retrain_result = _retrain(cfg, dataset, registry, model, DATA_DIR)
+
+    log.info("Nightly batch: dataset=%d rows, events=%d, lag=%s, retrain=%s",
+             rows, model.event_count(), lag["lag_minutes"], retrain_result)
     ran_at = _now_iso()
     status["last_nightly_at"] = ran_at
-    method = _publish_model_health(cfg, mqtt, rows, events, ran_at)
+    method = _publish_model_health(cfg, mqtt, rows, model, ran_at)
     _publish_registry(mqtt, registry)
-    return f"rows={rows} events={events} lag={lag['lag_minutes']} method={method}"
+    return (f"rows={rows} events={model.event_count()} lag={lag['lag_minutes']} "
+            f"method={method} retrain={retrain_result}")
 
 
 def _process_commands(
@@ -193,7 +217,7 @@ def main() -> int:
     sources = SourceCoordinator(cfg, ha, data_dir)
     features = FeatureBuilder(cfg, ha, sources)
     health = HealthTracker()
-    model = Model(cfg, registry)
+    model = Model(cfg, registry, data_dir)
     dataset = DatasetWriter(data_dir)
     storms = StormLog(data_dir, SHARE_DIR)
 
@@ -222,7 +246,7 @@ def main() -> int:
     _publish_pipeline(mqtt, status, "idle", "none")
     _publish_registry(mqtt, registry)
     _publish_storms(mqtt, storms)
-    _publish_model_health(cfg, mqtt, dataset.row_count(), model.event_count(), None)
+    _publish_model_health(cfg, mqtt, dataset.row_count(), model, None)
     _publish_lag(mqtt, load_lag(data_dir))
 
     last_nightly_day: int | None = None

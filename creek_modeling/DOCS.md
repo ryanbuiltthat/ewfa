@@ -119,11 +119,13 @@ question #5), WH51 calibration (#7), and observed storms (Phase 3).
 ## Persistent storage
 
 ```text
-/data/datasets/parts/*.jsonl          today's rows, appended each fast loop
-/data/datasets/dataset.parquet        consolidated nightly from completed parts
-/data/models/registry.json            versioned artifacts + skill metrics
-/data/state/*.json                    rain/API/SNODAS accumulator state
-/share/creek_modeling/events.sqlite   annotated storm event log
+/data/datasets/parts/*.jsonl              today's rows, appended each fast loop
+/data/datasets/dataset.parquet            consolidated nightly from completed parts
+/data/models/registry.json                versioned artifacts + skill metrics
+/data/models/model-<version>.json         a candidate/active artifact (xgboost native format)
+/data/models/model-<version>.meta.json    its feature column order + horizon
+/data/state/*.json                        rain/API/SNODAS accumulator state
+/share/creek_modeling/events.sqlite       annotated storm event log
 ```
 
 `/data` is private to this add-on. The storm log is the exception and lives in `/share`,
