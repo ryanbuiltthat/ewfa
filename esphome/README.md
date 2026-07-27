@@ -151,62 +151,78 @@ panel** — a linear charger burns the panel-to-cell voltage difference as heat,
 6 V → 4 V that is a third of the harvest. An MPPT or buck charger removes the December
 gap outright.
 
-### Sub-freezing charging is the real constraint
+### Sub-freezing charging, and why the pack size is not the answer
 
-**Lithium-ion must not be charged below 0 °C.** Doing so plates metallic lithium on the
-anode: permanent capacity loss, and eventually internal shorts. This is not a derating —
-it is a damage-and-safety limit, and it applies to every 18650 regardless of brand.
+**Lithium-ion must not be charged below 0 °C.** It plates metallic lithium on the anode:
+permanent capacity loss, then internal shorts. A damage-and-safety limit, not a derating.
+Use the charger's NTC input (the bq24074 has one — verify the Adafruit board exposes it
+rather than tying it off) with a 10 kΩ thermistor bonded to a **cell body**, mid-pack, not
+floating in enclosure air, which reads above freezing long before the cells do.
+Discharging cold is fine to about −20 °C; only charging is prohibited.
 
-The season runs to mid-December and starts in early spring, so sub-freezing days are
-routine at both ends. That means:
+So during a hard freeze the node runs on the pack alone. The obvious response is a huge
+pack, and it is the wrong one.
 
-- **Use the charger's NTC/thermistor input** (the bq24074 has one — verify the specific
-  Adafruit board exposes it rather than tying it off) with a 10 kΩ NTC bonded to the pack,
-  not to the enclosure air. It suspends charging outside the safe window automatically.
-- **Discharging cold is fine** — down to about −20 °C, at reduced capacity. Only charging
-  is prohibited.
-- Therefore the pack must carry the **longest sub-freezing stretch**, not merely the
-  longest overcast one. In NEPA a week below freezing in December is unremarkable, and
-  during it the panel contributes nothing no matter how big it is.
+**The problem is not the freeze, it is the recovery.** Surplus — what is left to refill a
+depleted pack after the load is served — is nearly zero in late autumn:
 
-That is what sets pack size.
+| | Charger | Load | Surplus | Refill 6P from empty |
+|---|---|---|---|---|
+| Nov | linear | 80 mA | +0.9 Wh/day | **70 days** |
+| early Dec | linear | 80 mA | **−0.5 Wh/day** | **never** |
+| early Dec | MPPT | 80 mA | +1.9 Wh/day | 36 days |
+| Nov | linear | **48 mA** | +3.8 Wh/day | 18 days |
+| early Dec | MPPT | **48 mA** | +4.7 Wh/day | 14 days |
+
+A node that goes flat in a December cold snap does not come back when the creek thaws. At
+an 80 mA load on a linear charger it is still flat in January, still flat in February, and
+only climbing out around March — **which is exactly when the season reopens, and when
+ice-jam and rain-on-snow risk peak.** Rain on snow is the major regional flood driver per
+spec §1, and an ice-jammed channel floods harder than an open one, so the tail of that
+outage lands on the highest-risk weeks of the year rather than the emptiest.
+
+That is the real cost of dying in winter — not the frozen days, which genuinely do not
+matter much, but the months of dead recovery afterwards. (The radar itself is not blind on
+ice: it measures distance to whatever surface is there.)
+
+**A bigger pack does not fix this.** It postpones the crossing and then takes proportionally
+longer to refill on the same non-existent surplus. What fixes it is making the surplus
+real:
+
+1. **Duty-cycle the radar on a switched 5 V rail.** ~80 mA → ~48 mA. This is the change
+   that turns early December from a net drain into a genuine surplus, and it is worth more
+   than any amount of pack. Needs a load switch, a GPIO, and a settle delay before the
+   Modbus read (datasheet: 100 ms startup). Not implemented — no hardware to test against.
+2. **MPPT or buck charger** instead of linear. Recovers the third of the harvest a linear
+   charger burns going 6 V → 4 V.
+3. **Low-voltage protection on the pack — required either way.** Without a cutoff the C6
+   will drag cells into deep discharge and ruin them, which converts "node is down" into
+   "pack is scrap, discovered in March." With one, going flat is survivable.
 
 ### Pack sizing (1S × P, ~3000 mAh cells)
 
-Usable capacity taken as 80 % to protect cycle life. The cold column is the one that
-matters, since the no-charge window is by definition cold:
+With the load duty-cycled, **4P–6P is plenty** — the earlier 8P–10P recommendation was
+compensating for a surplus problem that pack size cannot solve.
 
-| Pack | Capacity | Autonomy @ 20 °C | Autonomy @ 0 °C |
-|---|---|---|---|
-| 4P | 12 Ah | 5.0 days | 3.8 days |
-| **6P** | **18 Ah** | **7.5 days** | **5.6 days** |
-| **8P** | **24 Ah** | **10.0 days** | **7.5 days** |
-| 10P | 30 Ah | 12.5 days | 9.4 days |
+| Pack | Capacity | @ 20 °C | @ 0 °C, 80 mA | @ 0 °C, 48 mA |
+|---|---|---|---|---|
+| 4P | 12 Ah | 5.0 days | 3.8 days | 6.3 days |
+| 6P | 18 Ah | 7.5 days | 5.6 days | 9.4 days |
 
-**6P–8P is the sensible build.** 4P looks adequate at room temperature and is not: it
-gives under four days in exactly the conditions where charging is also unavailable.
+**The zero-cost alternative:** given the season genuinely ends mid-December, a planned
+winter shutdown is legitimate — pull the pack in December, charge it indoors, reinstall in
+February. It sidesteps the recovery problem entirely and needs no new hardware. It only
+works if it is deliberate, because the failure mode of *forgetting* is the March outage
+above.
 
 ### If you build the pack
 
-- **Match cells before welding.** Same capacity grade, and charge them all to within
-  ~0.05 V of each other first. In parallel a mismatched cell is charged by its neighbours
-  through the nickel, which is exactly the uncontrolled current path spot-welding makes
-  permanent.
-- **Fuse each cell** with a narrowed nickel link to the bus. A single internal short in one
-  of eight paralleled cells otherwise has the other seven dumping into it.
-- **NTC bonded to a cell body**, mid-pack, not floating in the enclosure — air temperature
-  will read above freezing long before the cells do.
-- Salvaged cells: capacity-test before committing. A pack is only as good as its worst
-  parallel member, and the whole point here is multi-day autonomy.
-
-### Duty-cycling the radar — now optional
-
-Switching the SEN0676's 5 V rail between reads cuts its contribution from ~35 mA to under
-1 mA — total draw ~48 mA, roughly a 40 % saving. With a 7 W panel and a 6P+ pack that is no
-longer needed for the energy balance. It remains attractive for one reason: it stretches
-the sub-freezing no-charge window by the same 40 %, turning 8P's 7.5 cold days into ~12.
-Needs a load switch, a GPIO, and a settle delay before the Modbus read (datasheet: 100 ms
-startup). Not implemented — no hardware to test against.
+- **Match and pre-balance cells** to within ~0.05 V before welding. In parallel a
+  mismatched cell is charged by its neighbours through the nickel — spot-welding makes that
+  uncontrolled current path permanent.
+- **Fuse each cell** to the bus with a narrowed link, so one internal short does not have
+  the others dumping into it.
+- **Capacity-test salvaged cells.** A parallel pack is only as good as its worst member.
 
 Deep sleep is still excluded. A flood-warning node asleep during the rise is not a
 flood-warning node.

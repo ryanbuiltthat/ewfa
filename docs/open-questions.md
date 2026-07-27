@@ -32,19 +32,22 @@ resolution as each is answered.
 10. Rain-on-snow thresholds (`app/features.py`: 0.20 in SWE, 34 °F) are placeholders, and
    the flag cannot be validated until a winter rain-on-snow event is actually captured.
 
-11. Solar/battery sizing for the creek node — **largely resolved, one item open.** The
-   firmware draws ~80 mA continuously (1.92 Ah/day = 7.1 Wh/day). Scoped to the stated
-   flood season (early spring → mid-December) rather than year-round, a **7 W panel** covers
-   March–November and is marginal only in early December, and only on a linear charger —
-   an MPPT/buck charger closes that gap and is worth more than extra panel area, since a
-   linear charger burns a third of the harvest as heat going 6 V → 4 V.
-   **The binding constraint is not sunlight, it is temperature:** Li-ion must never be
-   charged below 0 °C (lithium plating — permanent damage, then internal shorts), so the
-   pack has to carry the longest *sub-freezing* stretch, during which the panel
-   contributes nothing. That points at a **6P–8P 18650 pack** (5.6–7.5 days of cold
-   autonomy); 4P looks fine at room temperature and gives under four days cold.
-   **Still open:** (a) confirm the Adafruit charger board exposes the bq24074 NTC input
-   rather than tying it off, and bond a 10 kΩ NTC to a cell body; (b) measure the C6's
-   actual draw on the bench — it is an estimate and ~56 % of the budget; (c) run PVWatts
-   for the real pole location, where tree shading will dominate all of the above.
-   See `esphome/README.md`.
+11. Solar/battery sizing for the creek node. Load ~80 mA (1.92 Ah/day). Scoped to the
+   stated flood season (early spring → mid-December), a **7 W panel** covers March–November
+   and is marginal only in early December on a linear charger.
+   **The binding constraint is recovery, not capacity.** Li-ion cannot be charged below
+   0 °C, so a freeze runs on the pack alone — but late-autumn *surplus* (harvest minus
+   load) is ~+0.9 Wh/day in November and **negative in early December** at 80 mA on a
+   linear charger. A node that goes flat in a December cold snap therefore stays flat
+   through January and February and only recovers around March, which is when the season
+   reopens and ice-jam / rain-on-snow risk peaks. A bigger pack does not help: it delays
+   the crossing and then refills proportionally slower on the same absent surplus.
+   Fix the surplus instead: (a) duty-cycle the radar on a switched 5 V rail, ~80 → ~48 mA,
+   which alone turns early December positive; (b) MPPT/buck charger rather than linear,
+   recovering the third burned going 6 V → 4 V; (c) low-voltage protection on the pack,
+   required regardless, or a flat node becomes a scrap pack. With those, **4P–6P is
+   plenty**. A deliberate winter shutdown (pull and charge the pack indoors, reinstall in
+   February) is a legitimate zero-cost alternative.
+   **Still open:** confirm the Adafruit board exposes the bq24074 NTC input; measure the
+   C6's real draw (an estimate, ~56 % of the budget); PVWatts the actual pole, where tree
+   shading will dominate. See `esphome/README.md`.
