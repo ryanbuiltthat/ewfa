@@ -25,7 +25,7 @@
 |---|---|---|
 | DFRobot SEN0676 (80 GHz FMCW radar, ±5 mm, ±3° lens, 0.15–40 m, UART Modbus RTU, 3.5–5 V, ~30 mA) | Primary creek level | **To purchase** |
 | ESP32-C6 | Creek node MCU, ESPHome, WiFi to outdoor AP on back deck | On hand |
-| SparkFun LiPo fuel gauge + Adafruit solar/DC charger + panel + LiPo | Creek node power | On hand |
+| SparkFun LiPo fuel gauge + Adafruit solar/DC charger + panel + 1S Li-ion pack (18650) | Creek node power | On hand. "LiPo" and Li-ion are the same chemistry — 18650 cans are used for outdoor ruggedness and because they spot-weld. Charger/pack sizing: open questions #11-12. |
 | Ecowitt weather station (uploads to Weather Underground) | On-site rain, temp, wind | Installed |
 | Ecowitt WH51 soil moisture ×2 | Antecedent wetness | **Installed (×2)** |
 | Aluminum pole on large cherry tree at water's edge, guy-wired above | Sensor mount | To build |

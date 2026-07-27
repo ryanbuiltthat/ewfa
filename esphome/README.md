@@ -204,6 +204,7 @@ real:
 | | Charges below 0 °C? | Verdict |
 |---|---|---|
 | Li-ion (18650) | **No** — lithium plating | Current plan; needs NTC cutoff |
+| **LiPo (pouch)** | **No** — identical chemistry | **Same cell, different packaging.** "LiPo" is the pouch and polymer separator, not a different electrochemistry: same 3.7/4.2 V, same CC/CV profile, same 0 °C limit. For a pole in freeze-thaw the 18650's steel can is the more robust choice, and it is what the spot welder takes. (This is also why the existing "LiPoly" charger already charges 18650s correctly — the reason to replace it is linear-vs-MPPT, not chemistry.) |
 | **LiFePO4** | **No** — same 0 °C limit | **Does not help.** The common assumption that LFP fixes this is wrong; it buys cycle life and safety, not cold charging |
 | **NiMH** | Marginally — most datasheets also say 0–45 °C, some allow C/20 trickle lower | **Not worth it.** Tolerates trickle overcharge, which suits solar, but −ΔV termination is unreliable at solar currents, self-discharge is worse, and the cell stack voltage is awkward |
 | **Lead-acid (AGM)** | **Yes** — to about −20 °C with temperature-compensated voltage | **Genuinely solves it**, with two catches below |
