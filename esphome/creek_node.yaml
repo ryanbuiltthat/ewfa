@@ -115,11 +115,11 @@ globals:
     restore_value: false
     initial_value: 'NAN'
   - id: last_sample_ms
-    type: uint32
+    type: uint32_t
     restore_value: false
     initial_value: '0'
   - id: fast_until_ms
-    type: uint32
+    type: uint32_t
     restore_value: false
     initial_value: '0'
 

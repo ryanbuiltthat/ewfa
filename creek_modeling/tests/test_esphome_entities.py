@@ -168,6 +168,29 @@ def test_median_filter_is_valid_esphome():
                     f"send_first_at ({first}) must be <= send_every ({every})")
 
 
+# ESPHome pastes `type:` verbatim into globals::GlobalsComponent<T>, so an almost-right
+# name like `uint32` (rather than `uint32_t`) is accepted by config validation and only
+# explodes during compilation — as a wall of confusing "member 'value' in non-class type
+# 'int'" errors that point at the lambdas rather than at the declaration.
+VALID_GLOBAL_TYPES = {
+    "bool", "float", "double", "char",
+    "int", "unsigned int", "long", "unsigned long", "long long",
+    "int8_t", "int16_t", "int32_t", "int64_t",
+    "uint8_t", "uint16_t", "uint32_t", "uint64_t",
+    "std::string",
+}
+
+
+def test_global_types_are_real_cpp_types():
+    doc = load_node()
+    bad = [(g.get("id"), g.get("type")) for g in (doc.get("globals") or [])
+           if g.get("type") and not (
+               g["type"] in VALID_GLOBAL_TYPES
+               or re.match(r"^(std::array|std::vector)<", g["type"])
+               or re.match(r"^\w+\[\d+\]$", g["type"]))]
+    assert not bad, f"globals with types C++ will not recognise: {bad}"
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
