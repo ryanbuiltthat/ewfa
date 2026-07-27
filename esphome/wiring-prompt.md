@@ -57,10 +57,14 @@ Power chain:
   Solar panel +        → KSD9700 lead 1                      (red)
   KSD9700 lead 2       → CN3791 "IN" +                       (red)
   Solar panel −        → CN3791 "IN" −                       (black)
-  CN3791 "BAT" +       → protection board B+                 (red)
-  CN3791 "BAT" −       → protection board B−                 (black)
+  Battery pack BATT+   → protection board B+                 (red)
+  Battery pack BATT−   → protection board B−                 (black)
   Protection board P+  → PACK+ rail                          (red)
   Protection board P−  → GND rail                            (black)
+  CN3791 "BAT" +       → PACK+ rail  (i.e. protection P+)     (red)
+  CN3791 "BAT" −       → GND rail    (i.e. protection P−)     (black)
+  NOTE: the charger lands on P+/P− alongside the loads. ONLY the cell
+  touches B+/B−. See callout G.
   PACK+ → U1V11F3 VIN, U1V11F5 VIN, MAX17043 VCC             (red)
   GND   → U1V11F3 GND, U1V11F5 GND, MAX17043 GND, C6 GND,
           SEN0676 GND                                        (black)
@@ -87,6 +91,9 @@ CALLOUT ANNOTATIONS (as labeled notes with leader lines, not wires)
  E. On the CN3791: "⚠ Confirm which JST is IN and which is BAT before wiring."
  F. On the protection board: "Required — the CN3791 does not protect against
     over-discharge."
+ G. On the protection board: "Charger AND loads both on P+/P−. Only the cell
+    touches B+/B−. The protection MOSFETs sit between B− and P−, so a charger
+    wired to B+/B− bypasses over-charge and over-current protection entirely."
 
 STYLE
 Clean, well-spaced, hobbyist-electronics documentation look. Light background.
@@ -109,3 +116,4 @@ Each one is a mistake that is silent, expensive, or both — the reasoning lives
 | D | The datasheet gives the SEN0676 supply as 3.5–5 V but never states the signalling level. 5 V TTL straight into GPIO11 is over its absolute maximum. |
 | E | The two JSTs are input and battery, not paired panel inputs. A panel into the battery connector destroys the module. |
 | F | The CN3791 is a charger, not a BMS. This is what separates "node went flat" from "pack is scrap". |
+| G | Rev A of the diagram had the charger on B+/B− — an error in the first version of this prompt. That leaves over-discharge protection working (the loads are on P) while silently defeating over-charge and over-current, because the MOSFETs are between B− and P−. It matters most in the case the board exists for: if the CN3791's pass element fails shorted, a nominal-12 V panel at ~18–21 V Voc reaches a 1S pack with nothing in between. |

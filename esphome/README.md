@@ -211,7 +211,7 @@ Settled after working the budget; see open questions #11–12 for the reasoning.
 | Panel | 6 V, 7 W | Covers Mar–Nov; only early Dec is marginal |
 | Charger | CN3791-class 1S MPPT, **or** Waveshare Solar Power Manager **only if the `<2 mA` variant** | MPPT beats the linear bq24074's 67 %. Waveshare adds over-discharge protection but is spec'd at 78 % and some variants idle at 30–80 mA, which exceeds this node's whole budget |
 | Pack | 4P–6P 18650, 1S | On hand; more usable energy at 0 °C than an SLA twice the weight |
-| Pack protection | Low-voltage cutoff (board, or the charger's own) | Separates "node down" from "pack scrap" |
+| Pack protection | 1S protection board (over-discharge / over-current) | Separates "node down" from "pack scrap". **Cell to B+/B− only; charger *and* loads both to P+/P−** — the MOSFETs sit between B− and P−, so a charger on B+/B− bypasses over-charge and over-current entirely |
 | Radar rail | **Pololu U1V11F5** (5 V step-up, product 2562) | **True shutdown**: SHDN low disconnects the load rather than leaking input through, so it *is* the duty-cycle switch. <100 µA off, <1 mA running |
 | C6 rail | **Pololu U1V11F3** (3.3 V step-up, product 2561) | Boosts below 3.3 V and linearly down-regulates above, so it holds 3.3 V across the whole 1S range |
 
