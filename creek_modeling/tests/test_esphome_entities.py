@@ -133,6 +133,41 @@ def test_blanking_zone_matches_the_sensor_datasheet():
     assert int(subs["blanking_mm"]) >= 150, "blanking zone below the datasheet minimum range"
 
 
+# ESP32-C6 strapping pins (TRM): MTMS, MTDI, plus 8/9/15. A C3/S3 habit says three; the
+# C6 has five, and GPIO4/5 look innocuous. ESPHome only *warns* about strapping-pin use, so
+# a build stays green while the node reboots into the wrong mode or fails to flash.
+C6_STRAPPING_PINS = {"GPIO4", "GPIO5", "GPIO8", "GPIO9", "GPIO15"}
+# USB-JTAG pair; taking these costs the serial console the bench test depends on.
+C6_USB_PINS = {"GPIO12", "GPIO13"}
+
+
+def test_no_peripheral_lands_on_a_strapping_or_usb_pin():
+    subs = yaml.load(NODE.read_text(encoding="utf-8"), Loader=_EsphomeLoader)["substitutions"]
+    assigned = {k: v for k, v in subs.items() if k.endswith("_pin")}
+    bad = {k: v for k, v in assigned.items() if v in C6_STRAPPING_PINS | C6_USB_PINS}
+    assert not bad, f"pins on strapping/USB lines: {bad}"
+
+
+def test_pin_assignments_are_unique():
+    subs = yaml.load(NODE.read_text(encoding="utf-8"), Loader=_EsphomeLoader)["substitutions"]
+    pins = [v for k, v in subs.items() if k.endswith("_pin")]
+    assert len(pins) == len(set(pins)), f"a GPIO is assigned twice: {pins}"
+
+
+def test_median_filter_is_valid_esphome():
+    """send_first_at must be <= send_every. ESPHome rejects the config outright, so this
+    fails the fast Python suite rather than waiting on the slow compile job."""
+    doc = load_node()
+    for entry in doc.get("sensor") or []:
+        for f in entry.get("filters") or []:
+            median = (f or {}).get("median")
+            if median:
+                every = median.get("send_every", 1)
+                first = median.get("send_first_at", 1)
+                assert first <= every, (
+                    f"send_first_at ({first}) must be <= send_every ({every})")
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

@@ -16,9 +16,13 @@ substitutions:
   friendly_name: Creek
 
   # --- Wiring (GPIO matrix, so these are a choice, not a constraint) ---------------
-  # Avoids the C6 strapping pins (GPIO8/9/15) and the USB-JTAG pair (GPIO12/13).
-  uart_tx_pin: GPIO5      # -> sensor RX
-  uart_rx_pin: GPIO4      # <- sensor TX
+  # The ESP32-C6 has FIVE strapping pins — GPIO4, GPIO5, GPIO8, GPIO9, GPIO15 — not the
+  # three a C3/S3 habit suggests. GPIO12/13 are the USB-JTAG pair and 24-30 are SPI flash.
+  # GPIO10/11 and GPIO6/7 are clear of all of that. (An earlier revision used GPIO4/5
+  # believing they were safe; `esphome config` warns about strapping pins, which is how
+  # that was caught.)
+  uart_tx_pin: GPIO10     # -> sensor RX
+  uart_rx_pin: GPIO11     # <- sensor TX
   i2c_sda_pin: GPIO6
   i2c_scl_pin: GPIO7
 
@@ -157,9 +161,11 @@ sensor:
     state_class: measurement
     filters:
       - median:
+          # Publish a median of the trailing window on every sample. send_first_at must be
+          # <= send_every, so it stays at the default 1; the window simply fills as samples
+          # arrive rather than withholding the first few.
           window_size: ${median_window}
           send_every: 1
-          send_first_at: 3
     on_value:
       then:
         - lambda: |-

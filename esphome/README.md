@@ -17,13 +17,15 @@ add-on reads and what unlocks alert tiers 3–4.
 ## Wiring
 
 `creek_node.yaml` picks the pins; the C6 routes peripherals through a GPIO matrix, so
-these are a choice, not a constraint. They avoid the C6 strapping pins (GPIO8/9/15) and
-the USB-JTAG pair (GPIO12/13).
+these are a choice, not a constraint. The ESP32-C6 has **five** strapping pins —
+GPIO4, GPIO5, GPIO8, GPIO9, GPIO15 — not the three a C3/S3 habit suggests; GPIO12/13 are
+USB-JTAG and 24–30 are SPI flash. GPIO10/11 and GPIO6/7 are clear of all of it, and
+`test_esphome_entities.py` now asserts that, since ESPHome only *warns*.
 
 | ESP32-C6 | Device | Notes |
 |---|---|---|
-| GPIO5 | SEN0676 RX | node TX → sensor RX |
-| GPIO4 | SEN0676 TX | node RX ← sensor TX |
+| GPIO10 | SEN0676 RX | node TX → sensor RX |
+| GPIO11 | SEN0676 TX | node RX ← sensor TX |
 | GPIO6 / GPIO7 | Fuel gauge SDA / SCL | I²C, address 0x36 |
 | 5 V rail | SEN0676 VCC | sensor wants 3.5–5 V @ ~30 mA — boost/buck off the LiPo, not the C6's 3V3 |
 | GND | both | common ground |
