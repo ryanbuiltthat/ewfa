@@ -21,17 +21,39 @@ def test_queue_offer_and_drain_fifo():
     q = CommandQueue()
     q.offer("run_inference")
     q.offer("retrain")
-    assert q.drain() == ["run_inference", "retrain"]
+    assert q.drain() == [("run_inference", ""), ("retrain", "")]
     assert q.drain() == []  # drained empties it
+
+
+def test_queue_carries_a_payload():
+    """annotate is the one command where the payload is the whole point — the other
+    four ignore it, but the queue itself must not drop it for any of them."""
+    q = CommandQueue()
+    q.offer("annotate", "crest ~40min after upstream peak")
+    assert q.drain() == [("annotate", "crest ~40min after upstream peak")]
 
 
 def test_known_command_runs_handler():
     calls = []
-    proc = CommandProcessor({"retrain": lambda: calls.append("x") or "did retrain"})
+    proc = CommandProcessor({"retrain": lambda payload: calls.append("x") or "did retrain"})
     res = proc.handle("retrain")
     assert res.ok is True
     assert res.message == "did retrain"
     assert calls == ["x"]
+
+
+def test_handler_receives_the_payload():
+    received = []
+    proc = CommandProcessor({"annotate": lambda payload: received.append(payload) or "ok"})
+    proc.handle("annotate", "basement dry")
+    assert received == ["basement dry"]
+
+
+def test_handler_defaults_to_empty_payload():
+    received = []
+    proc = CommandProcessor({"retrain": lambda payload: received.append(payload)})
+    proc.handle("retrain")
+    assert received == [""]
 
 
 def test_unknown_command_rejected():
@@ -49,7 +71,7 @@ def test_missing_handler_for_known_command():
 
 
 def test_handler_exception_is_caught_not_raised():
-    def boom():
+    def boom(payload):
         raise ValueError("kaboom")
 
     proc = CommandProcessor({"retrain": boom})
@@ -60,7 +82,7 @@ def test_handler_exception_is_caught_not_raised():
 
 
 def test_handler_returning_none_defaults_to_ok():
-    proc = CommandProcessor({"run_inference": lambda: None})
+    proc = CommandProcessor({"run_inference": lambda payload: None})
     res = proc.handle("run_inference")
     assert res.ok is True
     assert res.message == "ok"

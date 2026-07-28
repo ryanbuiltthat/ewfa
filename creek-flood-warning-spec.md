@@ -409,10 +409,15 @@ pipeline is most useful *now*. Stock cards + the Prism theme; no custom frontend
 ### B.1 MQTT interface (add-on ⇄ HA)
 
 - **Commands** — HA → add-on, non-retained, `creek/cmd/<name>`:
-  `run_inference`, `retrain`, `promote`, `rollback`. The add-on keys off the trailing topic
-  segment (payload ignored) and executes on its single loop thread — commands are drained
-  between/within the fast-loop sleep, so no two tasks overlap and a press is honored within a
-  few seconds.
+  `run_inference`, `retrain`, `promote`, `rollback`, `annotate`. The add-on keys off the
+  trailing topic segment; the payload is ignored for the first four (buttons, empty
+  payload) but is the whole command for `annotate` — the note text typed into the
+  dashboard's "Annotate Latest Storm" text box, written onto the most recent *closed*
+  storm event (`StormLog.latest_closed`, spec §7 Phase 3) rather than simply the newest
+  row, since a second storm may already be open by the time the first gets annotated.
+  Every command executes on the single loop thread — drained
+  between/within the fast-loop sleep, so no two tasks overlap and a press is honored within
+  a few seconds.
 - **Status** — add-on → HA, retained JSON:
   `creek/status/pipeline` (`state`, `task`, `last_inference_at`, `last_nightly_at`,
   `last_error`), `creek/status/registry` (active/candidate versions + metrics + history,

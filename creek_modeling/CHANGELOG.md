@@ -3,6 +3,31 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.12.1
+
+- **Annotate storms from the Operator tab** — no more SSH/Samba/`sqlite3` for the normal
+  case. A new "Creek Storm To Annotate" sensor names the storm a note will apply to
+  (`Storm #<n>`, or `none yet`); type into the "Creek Annotate Latest Storm" text box and
+  hit enter to write it.
+
+  Targets the most recent **closed** event (`StormLog.latest_closed`), not simply the
+  newest row: annotation happens the day after a storm closes (spec §7), by which point a
+  second storm may already be open, and the newest row would then be the wrong one — the
+  operator's "the storm I watched yesterday" stops being `latest()` the moment that
+  happens. `latest_closed` is exactly "the most recent event with `ended_ts` set", and the
+  confirmation sensor reads the same field the write path uses, so what you see before
+  typing is what actually gets annotated.
+
+  The `sqlite3`/Samba path (storm-runbook.md) stays for what the text box can't do:
+  annotating an older un-annotated storm, or correcting a note already saved.
+
+- **MQTT command payloads are no longer discarded.** Every command before this one was a
+  zero-argument button, so `CommandQueue`/`CommandProcessor`/`_on_message` never carried a
+  payload past the topic's command name — correct for those four, but it meant `annotate`
+  had nowhere to put its text. `offer`/`drain`/`handle` now carry `(command, payload)`
+  throughout; the four existing handlers pick up an unused `payload` argument and are
+  otherwise unchanged.
+
 ## 0.12.0
 
 - **Phase 4 training pipeline built** (`app/train.py`, spec Addendum D). Fits an xgboost

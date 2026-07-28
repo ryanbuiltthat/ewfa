@@ -98,6 +98,9 @@ def _publish_storms(mqtt: MqttClient, storms: StormLog) -> None:
         "event_count": storms.count(),
         "open": bool(latest and latest.get("ended_ts") is None),
         "latest": latest,
+        # What the "annotate" text entity will actually target — see storms.latest_closed
+        # for why that can differ from `latest` once a second storm has started.
+        "latest_closed": storms.latest_closed(),
     })
 
 
@@ -177,9 +180,9 @@ def _nightly_batch(
 def _process_commands(
     processor: CommandProcessor, cmd_queue: CommandQueue, mqtt: MqttClient, status: dict,
 ) -> None:
-    for command in cmd_queue.drain():
+    for command, payload in cmd_queue.drain():
         _publish_pipeline(mqtt, status, "running", command)
-        result = processor.handle(command)
+        result = processor.handle(command, payload)
         mqtt.publish("status/command_result", result.as_dict(), retain=False)
         if not result.ok:
             status["last_error"] = f"{command}: {result.message}"
@@ -231,12 +234,13 @@ def main() -> int:
 
     processor = CommandProcessor(
         {
-            "run_inference": lambda: _run_inference_once(
+            "run_inference": lambda payload: _run_inference_once(
                 features, model, dataset, mqtt, status, health, sources, storms),
-            "retrain": lambda: _nightly_batch(
+            "retrain": lambda payload: _nightly_batch(
                 cfg, dataset, mqtt, model, registry, status, storms),
-            "promote": lambda: _promote(mqtt, registry),
-            "rollback": lambda: _rollback(mqtt, registry),
+            "promote": lambda payload: _promote(mqtt, registry),
+            "rollback": lambda payload: _rollback(mqtt, registry),
+            "annotate": lambda payload: _annotate(mqtt, storms, payload),
         }
     )
 
@@ -294,6 +298,24 @@ def _rollback(mqtt: MqttClient, registry: ModelRegistry) -> str:
     version = registry.rollback()
     _publish_registry(mqtt, registry)
     return f"rolled back to {version}"
+
+
+def _annotate(mqtt: MqttClient, storms: StormLog, payload: str) -> str:
+    """Write dashboard-submitted notes onto the most recent *closed* storm.
+
+    Raises rather than returning a failure string on purpose: CommandProcessor.handle
+    already catches and reports exceptions uniformly for every command, so this stays
+    consistent with the others instead of inventing a second error-reporting path.
+    """
+    text = payload.strip()
+    if not text:
+        raise ValueError("no annotation text provided")
+    event = storms.latest_closed()
+    if event is None:
+        raise ValueError("no closed storm event to annotate yet")
+    storms.annotate(event["id"], text)
+    _publish_storms(mqtt, storms)   # so the "ready to annotate" sensor reflects it live
+    return f"storm #{event['id']} annotated"
 
 
 if __name__ == "__main__":

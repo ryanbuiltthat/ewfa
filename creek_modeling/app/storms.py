@@ -236,6 +236,21 @@ class StormLog:
         events = self.events(limit=1)
         return events[0] if events else None
 
+    def latest_closed(self) -> dict | None:
+        """Most recent *closed* event — what annotation should target.
+
+        Distinct from `latest()`: a storm does not close until 6 h of quiet (spec §7),
+        so annotation realistically happens the next day, by which point a second storm
+        may already be open. `latest()` would then point at the wrong one — the storm
+        the operator watched yesterday isn't the newest row anymore. Targeting the newest
+        *closed* row is what "annotate what I just watched" actually means.
+        """
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT * FROM storm_events WHERE ended_ts IS NOT NULL "
+                "ORDER BY started_ts DESC LIMIT 1").fetchone()
+        return dict(row) if row else None
+
     def annotate(self, event_id: int, notes: str) -> None:
         """Attach a human note — the "annotated" half of the Phase 3 deliverable."""
         with self._connect() as con:

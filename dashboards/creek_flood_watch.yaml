@@ -232,6 +232,17 @@ views:
           # check on the method, NOT Ackerly's warning window.
           - entity: sensor.ackerly_creek_modeling_creek_lag_response_series
             name: ↳ fitted against
+          - type: divider
+          # Annotation from here, no SSH/Samba needed for the normal case. Shows *which*
+          # storm the text box targets — the most recent *closed* one, which may not be
+          # the newest row if a second storm has already opened — before you type
+          # anything, so you are never annotating blind. Anything more specific (an older
+          # un-annotated storm, correcting one already noted) still needs the sqlite3/
+          # Samba path in docs/storm-runbook.md.
+          - entity: sensor.ackerly_creek_modeling_creek_storm_to_annotate
+            name: Ready to annotate
+          - entity: text.ackerly_creek_modeling_creek_annotate_latest_storm
+            name: ↳ notes
 
       - type: entities
         title: Pipeline & model status

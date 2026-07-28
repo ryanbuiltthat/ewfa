@@ -128,6 +128,27 @@ def test_annotation_is_preserved():
     assert "culvert" in s.latest()["notes"]
 
 
+def test_latest_closed_ignores_a_newer_open_event():
+    """The regression this exists to prevent: annotation happens the day after a storm
+    closes, and a second storm may already be open by then. latest() would point at
+    that unfinished one -- the wrong target for "annotate what I watched yesterday"."""
+    s = make()
+    s.observe(row(T0, rain=0.5))
+    s.observe(row(T0 + 300, rain=0.0))
+    s.observe(row(T0 + st.END_QUIET_SECONDS + 600, rain=0.0))   # closes event 1
+    first_id = s.latest()["id"]
+
+    s.observe(row(T0 + st.END_QUIET_SECONDS + 3600, rain=0.6))  # event 2 opens
+    assert s.latest()["id"] != first_id       # latest() now points at the new, open one
+    assert s.latest_closed()["id"] == first_id  # latest_closed() still finds the real target
+
+
+def test_latest_closed_is_none_before_anything_has_closed():
+    s = make()
+    s.observe(row(T0, rain=0.5))   # opens an event, never closes it
+    assert s.latest_closed() is None
+
+
 def test_legacy_table_is_migrated_not_dropped():
     d = Path(tempfile.mkdtemp())
     db = d / "events.sqlite"

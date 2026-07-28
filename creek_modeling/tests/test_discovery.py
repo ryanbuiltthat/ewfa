@@ -20,12 +20,15 @@ def test_topics_and_counts():
     sensors = [t for t, _ in pairs if "/sensor/" in t]
     binaries = [t for t, _ in pairs if "/binary_sensor/" in t]
     buttons = [t for t, _ in pairs if "/button/" in t]
+    texts = [t for t, _ in pairs if "/text/" in t]
     # 16 status/model (incl. Phase 3 lag series) + 8 (2a incl. API index) + 8 (2b)
     # + 6 (2c) + 1 (2d) + 2 (2e) + 1 soil mean (migrated out of the HA package)
-    assert len(sensors) == 42, len(sensors)
+    # + 1 storm-to-annotate (dashboard annotation)
+    assert len(sensors) == 43, len(sensors)
     # 3 NWS flags + rain-on-snow + ponding + storm-in-progress + 9 watchdogs
     assert len(binaries) == 15, len(binaries)
     assert len(buttons) == 4, len(buttons)
+    assert len(texts) == 1, len(texts)   # annotate-latest-storm
     for topic, _ in pairs:
         assert topic.startswith("homeassistant/")
         assert topic.endswith("/config")
@@ -56,6 +59,26 @@ def test_buttons_have_command_topics():
     assert cfgs["creek_run_inference_now"]["command_topic"] == "creek/cmd/run_inference"
 
 
+def test_annotate_text_entity_has_the_right_command_topic():
+    pub, _ = build()
+    cfgs = {c["object_id"]: c for _, c in pub.configs()}
+    annotate = cfgs["creek_annotate_latest_storm"]
+    assert annotate["command_topic"] == "creek/cmd/annotate"
+    assert annotate["max"] >= 500   # a real note (times + basement + culvert) exceeds 255
+
+
+def test_storm_to_annotate_sensor_reads_latest_closed_not_latest():
+    """Guards picking the wrong field: `latest` can be an open event (see
+    storms.latest_closed's docstring), which is not what the text box beside it targets."""
+    import re
+
+    pub, _ = build()
+    cfgs = {c["object_id"]: c for _, c in pub.configs()}
+    refs = set(re.findall(r"value_json\.(\w+)",
+                          cfgs["creek_storm_to_annotate"]["value_template"]))
+    assert refs == {"latest_closed"}, refs
+
+
 def test_base_topic_is_honored():
     published = []
     pub = DiscoveryPublisher(lambda t, p, r: published.append((t, p, r)), "flood")
@@ -75,7 +98,7 @@ def test_rain_and_qpf_sensors_present():
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 61
+    assert len(published) == 63
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON
@@ -95,7 +118,7 @@ def test_every_value_template_resolves_against_a_published_payload():
         "features": set(FEATURE_KEYS) | set(DERIVED_KEYS),
         "status/health": set(WATCHDOG_KEYS),
         "soil": {"mean_pct", "ponding", "near_house_pct", "near_creek_pct"},
-        "status/storms": {"event_count", "open", "latest"},
+        "status/storms": {"event_count", "open", "latest", "latest_closed"},
         "status/lag": {"lag_minutes", "correlation", "response", "rain_series",
                        "samples", "reason"},
     }

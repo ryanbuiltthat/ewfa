@@ -30,16 +30,28 @@ def test_on_message_routes_command_topic():
     q = CommandQueue()
     client = make_client()
     client.subscribe_commands(q)
-    msg = SimpleNamespace(topic="creek/cmd/retrain")
+    msg = SimpleNamespace(topic="creek/cmd/retrain", payload=b"")
     client._on_message(None, None, msg)
-    assert q.drain() == ["retrain"]
+    assert q.drain() == [("retrain", "")]
+
+
+def test_on_message_carries_the_payload_through():
+    """The `annotate` command's whole point is the text typed into the dashboard —
+    routing by topic is not enough if the payload gets dropped along the way."""
+    q = CommandQueue()
+    client = make_client()
+    client.subscribe_commands(q)
+    msg = SimpleNamespace(topic="creek/cmd/annotate",
+                          payload="crest ~40min after upstream peak".encode("utf-8"))
+    client._on_message(None, None, msg)
+    assert q.drain() == [("annotate", "crest ~40min after upstream peak")]
 
 
 def test_on_message_ignores_non_command_topic():
     q = CommandQueue()
     client = make_client()
     client.subscribe_commands(q)
-    client._on_message(None, None, SimpleNamespace(topic="creek/flood_probability"))
+    client._on_message(None, None, SimpleNamespace(topic="creek/flood_probability", payload=b""))
     assert q.drain() == []
 
 

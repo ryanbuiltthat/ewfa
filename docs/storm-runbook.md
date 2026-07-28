@@ -48,12 +48,21 @@ Time-stamped phone photos count as all of the above.
 
 Storm events don't close until 6 h of quiet, so do this the following day.
 
-- [ ] Find the event and annotate it (the manual half of Phase 3). From the **SSH & Web
-      Terminal** add-on — no `docker exec`, no protection-mode toggle:
+- [ ] **Operator tab → Storms & lag → "Ready to annotate"** — confirm it names the storm
+      you watched (`Storm #<n>`), then type the times from *During* into **"↳ notes"** and
+      hit enter. That's it — no terminal, no SQL.
+
+  It targets the most recent **closed** storm, not just the newest row, so it's still
+  right even if a second storm has already opened since. If it says `none yet`, nothing
+  has closed — wait for the 6 h quiet window, or check Storm In Progress.
+
+- [ ] **Only if you need something the text box can't do** — annotating an *older*
+      un-annotated storm, or correcting a note already saved — use SQL directly. From the
+      **SSH & Web Terminal** add-on, no `docker exec`, no protection-mode toggle:
 
 ```sh
 sqlite3 /share/creek_modeling/events.sqlite \
-  "SELECT id, datetime(started_ts,'unixepoch','localtime') AS started, ended_ts
+  "SELECT id, datetime(started_ts,'unixepoch','localtime') AS started, ended_ts, notes
      FROM storm_events ORDER BY id DESC LIMIT 5;"
 
 sqlite3 /share/creek_modeling/events.sqlite \
@@ -63,7 +72,7 @@ sqlite3 /share/creek_modeling/events.sqlite \
 
 Same path over Samba if you'd rather use a GUI SQLite browser: `\\<ha-host>\share\creek_modeling\`.
 
-Put the times from *During* in the notes. That's what calibrates the lag.
+Either way, put the times from *During* in the notes. That's what calibrates the lag.
 
 - [ ] Judge the tiers: did it fire? too early, too late, not at all? Note it — every
       threshold in `creek_modeling/app/tiers.py` and `app/storms.py` is a placeholder, and

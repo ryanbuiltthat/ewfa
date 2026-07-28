@@ -96,6 +96,9 @@ class MqttClient:
         command = CommandQueue.command_from_topic(msg.topic)
         if command is None:
             return
+        # Most commands are zero-argument buttons with an empty payload; `annotate`
+        # is the one where this text is the entire command, not incidental to it.
+        payload = msg.payload.decode("utf-8", errors="replace") if msg.payload else ""
         log.info("Command received on %s -> %s", msg.topic, command)
         if self._cmd_queue is not None:
-            self._cmd_queue.offer(command)
+            self._cmd_queue.offer(command, payload)

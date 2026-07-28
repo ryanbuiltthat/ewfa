@@ -138,6 +138,21 @@ class DiscoveryPublisher:
                 "value_template": "{{ 'ON' if value_json.open else 'OFF' }}",
                 "payload_on": "ON", "payload_off": "OFF",
                 "device_class": "moisture", "icon": "mdi:weather-pouring"}),
+            # --- storm annotation from the Operator tab ---
+            # Shows *which* storm the text box below will annotate before anyone types
+            # anything: not necessarily "the storm I just watched" if a second one has
+            # already opened (storms.latest_closed — see its docstring). Full record
+            # (peaks, onset conditions, existing notes) rides along as attributes.
+            ("sensor", "creek_storm_to_annotate", {
+                "name": "Creek Storm To Annotate",
+                "state_topic": f"{b}/status/storms",
+                "value_template": ("{{ ('Storm #' ~ value_json.latest_closed.id) "
+                                  "if value_json.latest_closed is not none else 'none yet' }}"),
+                "json_attributes_topic": f"{b}/status/storms", "icon": "mdi:clipboard-text-clock-outline"}),
+            ("text", "creek_annotate_latest_storm", {
+                "name": "Creek Annotate Latest Storm",
+                "command_topic": f"{b}/cmd/annotate",
+                "mode": "text", "max": 500, "icon": "mdi:note-edit-outline"}),
             ("sensor", "creek_lag_response_series", {
                 "name": "Creek Lag Response Series",
                 "state_topic": f"{b}/status/lag",

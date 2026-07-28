@@ -13,8 +13,9 @@ results to Home Assistant over MQTT.
 ## Companion Home Assistant config
 
 **The add-on's own entities are created automatically via MQTT Discovery** — the `creek_*`
-sensors and buttons (flood probability, predicted crest, lag, alert tier, pipeline/model
-status, and the Run inference / Retrain / Promote / Rollback buttons) appear under an
+sensors, buttons, and the storm-annotation text box (flood probability, predicted crest,
+lag, alert tier, pipeline/model status, the Run inference / Retrain / Promote / Rollback
+buttons, and "Annotate Latest Storm") appear under an
 **Ackerly Creek Modeling** device with no package or `configuration.yaml` edit, and they
 re-publish (so they stay current) whenever the add-on updates. An MQTT LWT flips them to
 *unavailable* when the add-on is stopped.
