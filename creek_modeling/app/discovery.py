@@ -152,7 +152,15 @@ class DiscoveryPublisher:
             ("text", "creek_annotate_latest_storm", {
                 "name": "Creek Annotate Latest Storm",
                 "command_topic": f"{b}/cmd/annotate",
-                "mode": "text", "max": 500, "icon": "mdi:note-edit-outline"}),
+                # 255 is the platform's own hard ceiling for MQTT text entities, not a
+                # choice — HA's `text` component clamps native_max_value to (0, 255)
+                # regardless of what discovery asks for, and MQTT discovery validates
+                # against that schema *before* creating the entity: a `max` above 255
+                # does not get clamped, the whole discovery payload for that entity is
+                # rejected and nothing is created — silently, with no error the add-on
+                # itself can see. This entity did not exist in Home Assistant at all
+                # until this was caught (0.12.1 shipped with 500).
+                "mode": "text", "max": 255, "icon": "mdi:note-edit-outline"}),
             ("sensor", "creek_lag_response_series", {
                 "name": "Creek Lag Response Series",
                 "state_topic": f"{b}/status/lag",

@@ -3,6 +3,23 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.12.2
+
+- **Fixed: the annotation text box from 0.12.1 never actually existed in Home Assistant.**
+  Its discovery config set `max: 500`, but 255 is Home Assistant's hard ceiling for MQTT
+  text entities (`homeassistant.components.text`'s `native_max_value` is clamped to
+  `(0, 255)`, inherited by every platform including MQTT). A `max` above that is not
+  clamped down to fit — MQTT discovery validates the payload against the platform schema
+  *before* creating anything, so the whole discovery message for that one entity was
+  rejected and silently dropped. Every other entity in this release has no such
+  constraint, so nothing else was affected and nothing in the add-on's own logs pointed at
+  it — confirmed missing only from the HA-side MQTT device page, not from anything this
+  service could see about itself.
+
+  Set to 255. A `test_annotate_text_entity_max_is_within_the_mqtt_text_platform_ceiling`
+  guard now checks every entity with a `max` against that ceiling, verified to fail on the
+  0.12.1 config before this fix.
+
 ## 0.12.1
 
 - **Annotate storms from the Operator tab** — no more SSH/Samba/`sqlite3` for the normal

@@ -64,7 +64,18 @@ def test_annotate_text_entity_has_the_right_command_topic():
     cfgs = {c["object_id"]: c for _, c in pub.configs()}
     annotate = cfgs["creek_annotate_latest_storm"]
     assert annotate["command_topic"] == "creek/cmd/annotate"
-    assert annotate["max"] >= 500   # a real note (times + basement + culvert) exceeds 255
+
+
+def test_annotate_text_entity_max_is_within_the_mqtt_text_platform_ceiling():
+    """255 is not a preference, it is HA's hard limit for MQTT text entities. A `max`
+    above it does not get clamped -- the whole discovery payload for that entity is
+    rejected and the entity is never created, silently. That shipped once (0.12.1: 500)
+    and the entity simply did not exist in Home Assistant; this is the regression guard."""
+    pub, _ = build()
+    cfgs = {c["object_id"]: c for _, c in pub.configs()}
+    for object_id, cfg in cfgs.items():
+        if "max" in cfg:
+            assert 0 <= cfg["max"] <= 255, f"{object_id}: max={cfg['max']} exceeds the MQTT text ceiling"
 
 
 def test_storm_to_annotate_sensor_reads_latest_closed_not_latest():
