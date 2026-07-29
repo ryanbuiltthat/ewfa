@@ -44,6 +44,7 @@ SOURCE_WATCHDOGS = {
     "nwm": "nwm_data_missing",
     "usgs": "downstream_gauge_missing",
     "snodas": "snowpack_data_missing",
+    "radar": "radar_cells_missing",
 }
 
 WATCHDOG_KEYS = tuple(key for key, _ in ENTITY_INPUTS.values()) + tuple(

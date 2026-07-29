@@ -76,6 +76,8 @@ Set these on the **Configuration** tab.
 | `onsite_rain_daily_entity` | `sensor.outside_weather_station_rain_24hr` | Ecowitt. **Currently unused** — the rolling rain accumulations are integrated from `onsite_rain_rate_entity`, not read from here |
 | `usgs_downstream` | `true` | Poll USGS 01534860 / 01534000 (free, no key) for lag validation |
 | `snodas_swe` | `true` | Daily SNODAS snow-water-equivalent for the site cell (free, no key) |
+| `nexrad_cells` | `true` | NEXRAD storm-cell tracks via IEM (free, no key) — inbound-cell ETA for storms approaching from the W/NW, where the upstream gauges cannot lead |
+| `nexrad_radar_id` | `KBGM` | The WSR-88D covering the site (Binghamton) |
 | `onsite_temp_entity` | `sensor.outside_weather_station_outdoors_temp` | Ecowitt; needed for the rain-on-snow flag |
 
 ## How it talks to Home Assistant

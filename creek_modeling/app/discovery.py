@@ -304,6 +304,27 @@ class DiscoveryPublisher:
                 "value_template": "{{ 'ON' if value_json.rain_on_snow_flag else 'OFF' }}",
                 "payload_on": "ON", "payload_off": "OFF",
                 "device_class": "safety", "icon": "mdi:weather-snowy-rainy"}),
+            # --- ingested features (Addendum C 2g): NEXRAD storm-cell tracks ---
+            ("sensor", "creek_radar_cells_tracked", {
+                "name": "Creek Radar Cells Tracked",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.radar_cells_tracked if value_json.radar_cells_tracked is not none else none }}",
+                "state_class": "measurement", "icon": "mdi:radar"}),
+            ("sensor", "creek_radar_threat_cells", {
+                "name": "Creek Radar Threat Cells",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.radar_threat_cells if value_json.radar_threat_cells is not none else none }}",
+                "state_class": "measurement", "icon": "mdi:crosshairs-gps"}),
+            ("sensor", "creek_radar_threat_eta", {
+                "name": "Creek Radar Threat ETA",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.radar_threat_eta_min if value_json.radar_threat_eta_min is not none else none }}",
+                "unit_of_measurement": "min", "icon": "mdi:clock-fast"}),
+            ("sensor", "creek_radar_threat_max_dbz", {
+                "name": "Creek Radar Threat Max dBZ",
+                "state_topic": f"{b}/features",
+                "value_template": "{{ value_json.radar_threat_max_dbz if value_json.radar_threat_max_dbz is not none else none }}",
+                "unit_of_measurement": "dBZ", "icon": "mdi:signal"}),
             # --- soil moisture (migrated out of the HA package) ---
             ("sensor", "creek_soil_moisture_mean", {
                 "name": "Creek Soil Moisture Mean",
@@ -336,6 +357,7 @@ class DiscoveryPublisher:
                     ("nwm_data_missing", "NWM Data Missing", "mdi:waves-arrow-right"),
                     ("downstream_gauge_missing", "Downstream Gauge Missing", "mdi:gauge-empty"),
                     ("snowpack_data_missing", "Snowpack Data Missing", "mdi:snowflake-off"),
+                    ("radar_cells_missing", "Radar Cells Missing", "mdi:radar"),
                 )
             ),
             # --- command buttons ---

@@ -3,6 +3,36 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.13.0
+
+- **NEXRAD storm-cell tracking (slice 2g)** — inbound-cell early warning from KBGM's
+  Level 3 storm-attribute table (the same SCIT product radar apps draw as cell markers
+  with track vectors), via the Iowa Environmental Mesonet's CSV service. Free, no key,
+  updates every volume scan (~4–6 min in precip mode).
+
+  Why: storms here typically arrive from the W/NW, but the upstream PWS corridor lies to
+  the **SE** — geometrically behind the house for the dominant approach. A convective
+  cell on the usual track therefore hits the house *before* any upstream gauge sees rain,
+  and gridded QPF cannot resolve convection between forecast cycles. Radar cell tracks
+  are the only input that leads regardless of approach bearing.
+
+  Each intense cell (≥ 40 dBZ) is tested for closest approach against the site using its
+  SCIT motion vector: within 4 mi (covering the house and the short SE upstream corridor)
+  and inside 90 min makes it a threat; a threat inside 45 min raises the **Watch** tier —
+  the same meaning as "upstream rain, nothing at the gauge yet", just earlier. New
+  sensors: cells tracked, cells on intercept, soonest ETA, strongest inbound dBZ, plus a
+  `radar_cells_missing` watchdog, dashboard rows ("Inbound cells (radar)" on Flood Watch),
+  and options `nexrad_cells` / `nexrad_radar_id`.
+
+  The Level 3 `DRCT` field is the direction a cell comes **from** (wind convention), not
+  the direction it moves toward. That was verified empirically before trusting it —
+  regressing 45 live KBGM storm tracks' actual centroid displacement against their
+  reported `DRCT`: the from-convention matched all 45, the toward-convention none. A test
+  pins the convention with a hand-computed geometry case, since getting it backwards
+  silently inverts every threat call. The parser was also smoke-tested against a real
+  4-hour, 1038-row KBGM download from this evening's storm; it flagged 2 cells inbound at
+  ~2 min / 42 dBZ for the exact window when rain was falling on the site.
+
 ## 0.12.2
 
 - **Fixed: the annotation text box from 0.12.1 never actually existed in Home Assistant.**

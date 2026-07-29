@@ -65,6 +65,22 @@ def test_onsite_rain_is_a_watch():
     assert compute_tier(row(rain_6h_in=1.2), 0.0)[0] == 2
 
 
+def test_an_inbound_radar_cell_is_a_watch_before_any_gauge_sees_rain():
+    """The 2g slice's whole purpose: on the dominant W/NW approach the upstream gauges
+    are geometrically behind the house, so the radar track is the only leading signal."""
+    tier, label, reasons = compute_tier(
+        row(radar_threat_eta_min=25.0, radar_threat_cells=2.0, radar_threat_max_dbz=52.0), 0.0)
+    assert (tier, label) == (2, "Watch")
+    assert "radar" in reasons[0] and "25 min" in reasons[0]
+
+
+def test_a_distant_or_absent_radar_cell_never_fires():
+    # Beyond the gate: inbound but 80 min out is not yet a watch...
+    assert compute_tier(row(radar_threat_eta_min=80.0, radar_threat_cells=1.0), 0.0)[0] == 0
+    # ...and None (no inbound cell, or the source never polled) must never fire.
+    assert compute_tier(row(radar_threat_eta_min=None), 0.0)[0] == 0
+
+
 def test_stage_drives_warning_and_emergency():
     assert compute_tier(row(stage_ft=2.1), 0.0)[:2] == (3, "Warning")
     assert compute_tier(row(stage_ft=2.9), 0.0)[:2] == (4, "Emergency")

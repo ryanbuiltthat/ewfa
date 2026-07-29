@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.12.2"
+version: "0.13.0"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa
@@ -58,6 +58,11 @@ options:
   # SNODAS snow water equivalent for the site's grid cell — free, no key. Feeds the
   # rain-on-snow flag (spec §1); pair it with onsite_temp_entity for that to fire.
   snodas_swe: true
+  # NEXRAD storm-cell tracks via IEM — free, no key. Inbound-cell early warning for
+  # the dominant W/NW approach, where storms hit the house before the SE upstream
+  # gauges see rain. KBGM (Binghamton) is the radar covering the site.
+  nexrad_cells: true
+  nexrad_radar_id: "KBGM"
   onsite_temp_entity: sensor.outside_weather_station_outdoors_temp
 
 schema:
@@ -79,4 +84,6 @@ schema:
   onsite_rain_daily_entity: str?
   usgs_downstream: bool
   snodas_swe: bool
+  nexrad_cells: bool
+  nexrad_radar_id: str?
   onsite_temp_entity: str?

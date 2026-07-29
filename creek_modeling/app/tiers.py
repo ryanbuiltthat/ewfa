@@ -58,6 +58,11 @@ WATCH_UPSTREAM_3H_IN = 0.75
 WATCH_UPSTREAM_6H_IN = 1.00
 WATCH_ONSITE_6H_IN = 1.00
 WATCH_PROBABILITY = 0.20
+# An intense radar cell on an intercept course is the same meaning as "upstream rain,
+# nothing at the gauge yet" — just earlier, and it works for the dominant W/NW approach
+# where the upstream gauges are geometrically behind the house (sources/radar_cells.py).
+# The source already filters to >= 40 dBZ inbound cells; this only gates on how soon.
+WATCH_RADAR_ETA_MIN = 45.0
 
 # --- Tier 3 Warning: creek responding (gauge required) ---
 WARNING_STAGE_FT = 2.0             # bank top is +3 ft (spec §2)
@@ -119,6 +124,13 @@ def compute_tier(row: FeatureRow, flood_probability: float | None) -> tuple[int,
         reasons.append((2, f"{row.upstream_rain_6h_in:.2f}\" upstream rain in 6 h"))
     if _ge(row.rain_6h_in, WATCH_ONSITE_6H_IN):
         reasons.append((2, f"{row.rain_6h_in:.2f}\" on-site rain in 6 h"))
+    # Note the inverted comparison: a *smaller* ETA is the worse condition, so _ge does
+    # not apply — and a missing ETA (None = no inbound cell) must still never fire.
+    if row.radar_threat_eta_min is not None and row.radar_threat_eta_min <= WATCH_RADAR_ETA_MIN:
+        count = int(row.radar_threat_cells or 1)
+        dbz = f" ({row.radar_threat_max_dbz:.0f} dBZ)" if row.radar_threat_max_dbz else ""
+        reasons.append((2, f"{count} radar cell(s) inbound{dbz}, "
+                           f"~{row.radar_threat_eta_min:.0f} min out"))
     if p >= WATCH_PROBABILITY:
         reasons.append((2, f"model probability {p * 100:.0f}%"))
 

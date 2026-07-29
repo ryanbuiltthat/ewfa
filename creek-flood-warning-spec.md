@@ -519,6 +519,18 @@ read once from HA `/api/config` — no new option.
 - **2f — Antecedent Precipitation Index (done):** `apindex.py`, an exponentially-decaying
   rainfall memory riding on the on-site rain samples. Complements the two WH51 probes with a
   basin-wide view of how wet the ground already is.
+- **2g — NEXRAD storm-cell tracks (done):** `radar_cells.py` (KBGM's Level 3 storm-attribute
+  table via the Iowa Environmental Mesonet CSV service; free, no key; per volume scan,
+  ~4–6 min in precip mode). Closes the geometry gap 2a/2b cannot: storms here typically
+  arrive from the W/NW while the upstream PWS corridor lies to the *SE*, so a convective
+  cell on the dominant track reaches the house **before** any upstream gauge sees rain —
+  and 2a's own note concedes gridded QPF cannot resolve convection at all. Each intense
+  cell (≥40 dBZ) is tested for closest approach against the site using its SCIT motion
+  vector (`DRCT` is direction-*from*, verified empirically against 45 live storm tracks);
+  a cell passing within 4 mi inside 90 min is a threat, and one inside 45 min raises the
+  Watch tier. Features: `radar_cells_tracked`, `radar_threat_cells`,
+  `radar_threat_eta_min`, `radar_threat_max_dbz`. SCIT tracks only discrete cells —
+  stratiform shields produce no rows, which is fine: QPF handles those.
 
 Still to build for Phase 2: **Google Flood Forecasting** (`gauges:searchGaugesByArea`, §3)
 — deferred pending API access, and open question #2 stays open with it.

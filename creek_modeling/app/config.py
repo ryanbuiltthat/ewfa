@@ -62,6 +62,8 @@ class Config:
     upstream_pws_ids: list[str] = field(default_factory=list)
     usgs_downstream: bool = True
     snodas_swe: bool = True
+    nexrad_cells: bool = True
+    nexrad_radar_id: str = "KBGM"
     onsite_temp_entity: str | None = None
 
     # MQTT (from service discovery via run.sh)
@@ -95,6 +97,8 @@ class Config:
             upstream_pws_ids=list(opts.get("upstream_pws_ids", [])),
             usgs_downstream=bool(opts.get("usgs_downstream", True)),
             snodas_swe=bool(opts.get("snodas_swe", True)),
+            nexrad_cells=bool(opts.get("nexrad_cells", True)),
+            nexrad_radar_id=opts.get("nexrad_radar_id") or "KBGM",
             onsite_temp_entity=opts.get("onsite_temp_entity") or None,
             mqtt_host=env.get("MQTT_HOST", "core-mosquitto"),
             mqtt_port=int(env.get("MQTT_PORT", 1883)),

@@ -19,6 +19,7 @@ from ..ha import HAClient
 from .alerts import NwsAlerts
 from .nwm import NwmReach
 from .nws import NwsQpf
+from .radar_cells import RadarCells
 from .rain import RainAccumulator
 from .snodas import SnodasSwe
 from .usgs import SITES as USGS_SITES, UsgsDownstream, feature_keys as usgs_feature_keys
@@ -44,6 +45,9 @@ FEATURE_KEYS = (
     "nws_flood_watch", "nws_flood_warning", "nws_flash_flood_warning", "nws_alert_count",
     # 2e — SNODAS snowpack
     "snow_water_equivalent_in",
+    # 2g — NEXRAD storm-cell tracks (inbound-cell early warning)
+    "radar_cells_tracked", "radar_threat_cells",
+    "radar_threat_eta_min", "radar_threat_max_dbz",
 )
 
 
@@ -63,8 +67,12 @@ class SourceCoordinator:
             if cfg.snodas_swe:
                 self._sources.append(SnodasSwe(*latlon, data_dir))
                 log.info("SNODAS SWE enabled")
+            if cfg.nexrad_cells:
+                self._sources.append(RadarCells(*latlon, cfg.nexrad_radar_id))
+                log.info("NEXRAD cell tracking enabled (radar %s)", cfg.nexrad_radar_id)
         else:
-            log.warning("No lat/lon from HA config — NWS QPF, alerts and SNODAS disabled")
+            log.warning("No lat/lon from HA config — NWS QPF, alerts, SNODAS and "
+                        "NEXRAD cells disabled")
 
         if cfg.wu_api_key and cfg.upstream_pws_ids:
             self._sources.append(WuUpstream(cfg.wu_api_key, cfg.upstream_pws_ids, data_dir))
