@@ -22,11 +22,11 @@ def test_topics_and_counts():
     buttons = [t for t, _ in pairs if "/button/" in t]
     texts = [t for t, _ in pairs if "/text/" in t]
     # 16 status/model (incl. Phase 3 lag series) + 8 (2a incl. API index) + 8 (2b)
-    # + 6 (2c) + 1 (2d) + 2 (2e) + 1 soil mean (migrated out of the HA package)
-    # + 1 storm-to-annotate (dashboard annotation)
-    assert len(sensors) == 43, len(sensors)
-    # 3 NWS flags + rain-on-snow + ponding + storm-in-progress + 9 watchdogs
-    assert len(binaries) == 15, len(binaries)
+    # + 6 (2c) + 1 (2d) + 2 (2e) + 4 (2g radar cells) + 1 soil mean (migrated out of
+    # the HA package) + 1 storm-to-annotate (dashboard annotation)
+    assert len(sensors) == 47, len(sensors)
+    # 3 NWS flags + rain-on-snow + ponding + storm-in-progress + 10 watchdogs
+    assert len(binaries) == 16, len(binaries)
     assert len(buttons) == 4, len(buttons)
     assert len(texts) == 1, len(texts)   # annotate-latest-storm
     for topic, _ in pairs:
@@ -109,7 +109,7 @@ def test_rain_and_qpf_sensors_present():
 def test_publish_all_emits_retained_json():
     pub, published = build()
     pub.publish_all()
-    assert len(published) == 63
+    assert len(published) == 68
     for topic, payload, retain in published:
         assert retain is True
         json.loads(payload)  # valid JSON

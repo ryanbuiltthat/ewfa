@@ -61,6 +61,12 @@ class FeatureRow:
     nws_alert_count: float | None = None
     # SNODAS snowpack + the rain-on-snow condition it enables (spec §1/§5).
     snow_water_equivalent_in: float | None = None
+    # NEXRAD storm-cell tracks (slice 2g) — the only leading indicator for cells on the
+    # dominant W/NW approach, which reach the house before any upstream gauge sees rain.
+    radar_cells_tracked: float | None = None
+    radar_threat_cells: float | None = None
+    radar_threat_eta_min: float | None = None
+    radar_threat_max_dbz: float | None = None
     temp_f: float | None = None
     rain_on_snow_flag: bool = False
 
