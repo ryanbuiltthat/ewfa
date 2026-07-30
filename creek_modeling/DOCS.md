@@ -66,6 +66,9 @@ Set these on the **Configuration** tab.
 | `mqtt_base_topic` | `creek` | Base MQTT topic |
 | `publish_prefix` | `creek` | MQTT topic prefix (entity IDs come from discovery, see below) |
 | `min_events_for_ml` | `10` | Stay on the threshold model until ≥ N storms captured |
+| `storm_start_rain_1h_in` | `0.10` | 1 h rain (on-site **or** upstream) that opens a storm event |
+| `storm_continue_rain_1h_in` | `0.02` | Below this a storm counts as paused; the quiet clock runs |
+| `storm_quiet_hours` | `6` | Paused this long and the storm has ended. Too long merges separate storms, too short splits one in two — tune against observed storms |
 | `google_floods_api_key` | `""` | Optional (Google Flood status) |
 | `wu_api_key` | `""` | Optional (Weather Underground PWS) |
 | `nwm_reach_id` | `4196026` | NWM reach at the sensor site (open question #3) |

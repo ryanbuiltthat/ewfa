@@ -49,6 +49,14 @@ class Config:
     publish_prefix: str = "creek"
     min_events_for_ml: int = 10
 
+    # Storm detection (app/storms.py). Tunable because they define what counts as one
+    # storm, and the event log is the input to the lag analysis — a quiet window that is
+    # too long merges an afternoon's storms into the morning's, too short splits one in
+    # two, and either way the lag it teaches is wrong.
+    storm_start_rain_1h_in: float = 0.10
+    storm_continue_rain_1h_in: float = 0.02
+    storm_quiet_hours: float = 6.0
+
     # Secrets (env only; never logged)
     google_floods_api_key: str = ""
     wu_api_key: str = ""
@@ -87,6 +95,9 @@ class Config:
             mqtt_base_topic=env.get("MQTT_BASE_TOPIC", "creek"),
             publish_prefix=env.get("PUBLISH_PREFIX", "creek"),
             min_events_for_ml=int(env.get("MIN_EVENTS_FOR_ML", 10)),
+            storm_start_rain_1h_in=float(env.get("STORM_START_RAIN_1H_IN", 0.10)),
+            storm_continue_rain_1h_in=float(env.get("STORM_CONTINUE_RAIN_1H_IN", 0.02)),
+            storm_quiet_hours=float(env.get("STORM_QUIET_HOURS", 6.0)),
             google_floods_api_key=env.get("GOOGLE_FLOODS_API_KEY", ""),
             wu_api_key=env.get("WU_API_KEY", ""),
             nwm_reach_id=env.get("NWM_REACH_ID", ""),

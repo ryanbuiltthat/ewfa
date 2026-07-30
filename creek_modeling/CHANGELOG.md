@@ -3,6 +3,36 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.14.0
+
+- **Fixed: a restart mid-storm could close the storm on the next lull, and stamp it as
+  having ended the moment it began.** The quiet clock — the "how long since it last
+  rained" that decides when an event ends — was an instance attribute, so a restart reset
+  it to `None` and the fallback became the storm's own `started_ts`. For any storm open
+  longer than the quiet window (an ordinary all-day rain), that fallback read as a full
+  window of quiet *already elapsed*, so the first sample below the pause threshold closed
+  the event immediately. It then recorded `ended_ts = started_ts`: a storm of zero
+  duration, in the record the lag analysis is built from.
+
+  The anchor now lives on the row (`last_rain_ts`, added by the usual additive
+  migration), so it survives restarts, and the event still ends when the rain stopped
+  rather than when the service noticed. A row with no anchor — one opened by the older
+  code, including a storm open at upgrade time — is treated as *unknowable* rather than
+  as quiet-since-onset: the clock restarts instead of closing on a guess. Four tests
+  cover it, each verified to fail against the previous implementation.
+
+- **Storm detection thresholds are now add-on options**, because they define what counts
+  as one storm and that cannot be settled without storms on record: `storm_start_rain_1h_in`
+  (default 0.10 in/h), `storm_continue_rain_1h_in` (0.02), `storm_quiet_hours` (6). Too
+  long a quiet window merges an afternoon's storms into the morning's; too short splits
+  one storm in two. Either way the lag it teaches is wrong, so they belong in the UI
+  rather than in the source. The configured values are logged at startup.
+
+  Note what this cannot fix: the close test takes the *stronger* of the on-site and
+  upstream 1 h rain, so a single stuck PWS reporting a phantom rain rate holds every
+  storm open indefinitely — the quiet clock never starts, and no window length helps.
+  The runbook now says how to spot that.
+
 ## 0.13.0
 
 - **NEXRAD storm-cell tracking (slice 2g)** — inbound-cell early warning from KBGM's
