@@ -46,20 +46,55 @@ template:
 automation:
   # Tier evaluation lives in the add-on (app/tiers.py) and arrives as
   # sensor.ackerly_creek_modeling_creek_alert_tier. This automation is the HA-side *action*
-  # half of spec §6 — it has to be here because it calls persistent_notification.
+  # half of spec §6 — it has to be here because it calls persistent_notification and the
+  # companion-app notify services.
   #
   # Tier scale: 0 All-clear · 1 Advisory · 2 Watch · 3 Warning · 4 Emergency.
   #
-  # DELIBERATELY CONSERVATIVE: notifications only. The escalating actions in spec §6
-  # (mobile push, TTS, wake-the-house) are NOT wired up — thresholds are uncalibrated
-  # (open questions #5/#7) and §8 requires every wake-the-family action to be dry-run
-  # testable first. Add notify targets here once a few storms have validated the tiers.
+  # Mobile push is wired up; TTS and any wake-the-house action beyond the phone are still
+  # NOT, because §8 requires every one of those to be dry-run testable first and the
+  # thresholds remain uncalibrated (open questions #5/#7).
   - id: creek_tier_change
     alias: "Creek alert tier changed"
     description: >-
-      Posts a persistent notification whenever the add-on's alert tier changes, including
-      the reason that drove it. Tiers 1-2 are forecast/rainfall driven and work without
-      the creek gauge; tiers 3-4 stay dormant until the ESPHome node reports stage.
+      Posts a persistent notification and a companion-app push whenever the add-on's alert
+      tier changes, including the reason that drove it. Tiers 1-2 are forecast/rainfall
+      driven and work without the creek gauge; tiers 3-4 stay dormant until the ESPHome
+      node reports stage.
+    variables:
+      # ======================= CONFIGURE NOTIFICATIONS HERE =======================
+      # Every companion-app device to alert. Add more lines to notify more people:
+      #   - notify.mobile_app_someones_phone
+      # A target that is offline or misspelled is skipped, not fatal — one dead phone
+      # must never stop the others being told.
+      notify_targets:
+        - notify.ryanphone
+
+      # At or above this tier the push is CRITICAL: it plays on Android's alarm stream,
+      # so it sounds at alarm volume through silent and vibrate, and stays on screen until
+      # dismissed. Below it, an ordinary push.
+      #
+      # Default 2 (Watch) rather than 3 (Warning) for a specific reason: tiers 3-4 need
+      # the creek gauge, which is not mounted yet, so a critical floor of 3 would mean no
+      # critical alert can physically fire today. Watch — "rain is falling upstream, the
+      # creek has not answered yet" — is the most urgent tier currently reachable, and in
+      # a basin where rainfall-to-crest is tens of minutes (spec §1) it is the one worth
+      # waking up for. Raise this to 3 once the gauge is in and the thresholds are
+      # calibrated, or to 5 to disable critical pushes entirely.
+      critical_from_tier: 2
+      # ============================================================================
+
+      tier: "{{ trigger.to_state.state | int(0) }}"
+      # Read from the triggering state, not from states()/state_attr(): by the time the
+      # actions run the entity may already have moved on, and the alert would then
+      # describe a tier different from the one that fired it.
+      label: "{{ trigger.to_state.attributes.get('label') or 'alert' }}"
+      why: "{{ trigger.to_state.attributes.get('why') or 'No reason reported.' }}"
+      is_critical: "{{ (trigger.to_state.state | int(0)) >= critical_from_tier }}"
+      push_title: >-
+        {{ 'Creek all-clear' if (trigger.to_state.state | int(0)) == 0
+           else 'Creek ' ~ (trigger.to_state.attributes.get('label') or 'alert')
+                ~ ' (Tier ' ~ trigger.to_state.state ~ ')' }}
     triggers:
       - trigger: state
         entity_id: sensor.ackerly_creek_modeling_creek_alert_tier
@@ -72,12 +107,12 @@ automation:
              and trigger.from_state.state not in ['unknown', 'unavailable']
              and trigger.to_state.state != trigger.from_state.state }}
     actions:
+      # --- Home Assistant UI ---
       - choose:
           # Back to all-clear: replace the notification rather than leaving a stale alarm.
           - conditions:
-              - condition: state
-                entity_id: sensor.ackerly_creek_modeling_creek_alert_tier
-                state: "0"
+              - condition: template
+                value_template: "{{ tier == 0 }}"
             sequence:
               - action: persistent_notification.dismiss
                 data:
@@ -96,13 +131,44 @@ automation:
           - action: persistent_notification.create
             data:
               notification_id: creek_alert_tier
-              title: >-
-                Creek {{ state_attr('sensor.ackerly_creek_modeling_creek_alert_tier',
-                                    'label') or 'alert' }}
-                (Tier {{ states('sensor.ackerly_creek_modeling_creek_alert_tier') }})
+              title: "{{ push_title }}"
               message: >-
-                {{ state_attr('sensor.ackerly_creek_modeling_creek_alert_tier', 'why')
-                   or 'No reason reported.' }}
+                {{ why }}
 
                 _Thresholds are not yet field-calibrated — verify before acting._
+
+      # --- Companion app ---
+      # One push per configured target. `tag` is constant so each new tier *replaces* the
+      # previous notification instead of stacking a pile of them through a storm, and the
+      # all-clear overwrites the alarm rather than sitting below it.
+      - repeat:
+          for_each: "{{ notify_targets }}"
+          sequence:
+            - action: "{{ repeat.item }}"
+              continue_on_error: true
+              data:
+                title: "{{ push_title }}"
+                message: >-
+                  {{ why }}
+                  {{ '' if tier == 0 else
+                     '— thresholds are not yet field-calibrated; verify before acting.' }}
+                data:
+                  tag: creek_alert_tier
+                  notification_icon: >-
+                    {{ 'mdi:check-circle-outline' if tier == 0 else 'mdi:home-flood' }}
+                  # ttl/priority get the push past Android's Doze batching; without them a
+                  # sleeping phone may sit on the message until the screen wakes.
+                  ttl: 0
+                  priority: high
+                  # alarm_stream is the companion app's documented critical channel: the
+                  # sound plays on the alarm stream, which is what carries it through
+                  # silent, vibrate and Do Not Disturb. See the DND caveat in DOCS.md —
+                  # Android must be allowing alarms through DND for this to be audible,
+                  # which is its default but is worth confirming once, out loud, before
+                  # relying on it at 3 a.m.
+                  channel: "{{ 'alarm_stream' if is_critical else 'Creek Watch' }}"
+                  importance: "{{ 'high' if is_critical else 'default' }}"
+                  # A critical alert stays put until acknowledged; lower tiers behave like
+                  # any other notification.
+                  sticky: "{{ 'true' if is_critical else 'false' }}"
     mode: single

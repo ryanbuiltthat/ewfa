@@ -22,8 +22,8 @@ re-publish (so they stay current) whenever the add-on updates. An MQTT LWT flips
 
 Two things still need a **one-time** manual setup (they can't come from the add-on):
 
-1. **Layer-1 package** — soil-moisture template sensors, the Tier-0 automation, and the
-   sensor-fault watchdogs. Copy `ha-packages/creek_warning.yaml` from the
+1. **Layer-1 package** — the service-stale watchdog and the alert-tier automation. Copy
+   `ha-packages/creek_warning.yaml` from the
    [ewfa repo](https://github.com/ryanbuiltthat/ewfa) → `/config/ha-packages/`, and enable
    packages in `/config/configuration.yaml`:
 
@@ -31,6 +31,29 @@ Two things still need a **one-time** manual setup (they can't come from the add-
    homeassistant:
      packages: !include_dir_named ha-packages
    ```
+
+   **Set your phones** in the `CONFIGURE NOTIFICATIONS HERE` block at the top of the
+   `creek_tier_change` automation — one `notify.` service per line:
+
+   ```yaml
+   notify_targets:
+     - notify.ryanphone
+     - notify.mobile_app_someone_else   # add as many as you like
+   critical_from_tier: 2                # 2 = Watch. Raise to 3 once the gauge is in
+   ```
+
+   At or above `critical_from_tier` the push goes out on Android's `alarm_stream`
+   channel, so it sounds at alarm volume through silent and vibrate and stays on screen
+   until dismissed. Below it, an ordinary notification.
+
+   > **Do Not Disturb, and the one thing this repo cannot do for you.** `alarm_stream`
+   > carries the alert through DND *because Android treats it as an alarm* — which works
+   > only while your DND profile is allowing alarms through. That is Android's default,
+   > but it is a device-side setting no YAML here can set or read back. Test it once for
+   > real: turn DND on, put the phone face-down, and fire the automation manually
+   > (Developer tools → Actions → `automation.trigger`). If it does not wake the room,
+   > check Android Settings → Sound → Do Not Disturb → Alarms. An untested alarm is not
+   > an alarm.
 
 2. **Dashboard** — copy `dashboards/creek_flood_watch.yaml` → `/config/dashboards/` and
    register it (core Lovelace, keeps your UI dashboards untouched):

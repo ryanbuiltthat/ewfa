@@ -2,8 +2,11 @@
 
 What to do when a storm hits. Checklist form — meant to be readable on a phone at 2 am.
 
-> **ewfa will not wake you.** Alerts are persistent notifications in the HA UI only.
-> No push, no TTS (uncalibrated thresholds — spec §8 requires dry-run testing first).
+> **ewfa now pushes to your phone — but do not treat it as your alarm clock.** Tier 2
+> (Watch) and above send a critical push on Android's alarm stream, which sounds through
+> silent and Do Not Disturb; below that, an ordinary notification. It has to be tested on
+> your own phone with DND actually on before it counts as an alarm (DOCS.md says how),
+> and the thresholds behind it are still uncalibrated. No TTS, nothing else in the house.
 > **NWS/NOAA is still your real alerting path.** This is a data-collection aid.
 
 > **Tier 4 cannot fire yet.** The SEN0676 radar isn't mounted, so tiers 3–4 are dormant
