@@ -222,7 +222,12 @@ def main() -> int:
     health = HealthTracker()
     model = Model(cfg, registry, data_dir)
     dataset = DatasetWriter(data_dir)
-    storms = StormLog(data_dir, SHARE_DIR)
+    storms = StormLog(
+        data_dir, SHARE_DIR,
+        start_rain_1h_in=cfg.storm_start_rain_1h_in,
+        continue_rain_1h_in=cfg.storm_continue_rain_1h_in,
+        quiet_seconds=cfg.storm_quiet_hours * 3600,
+    )
 
     status = {
         "state": "idle",

@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.13.0"
+version: "0.14.1"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa
@@ -27,6 +27,13 @@ options:
   mqtt_base_topic: creek
   publish_prefix: creek          # -> sensor.creek_flood_probability, etc.
   min_events_for_ml: 10          # gate: threshold model until >= N storms captured
+  # --- Storm detection (what counts as one storm) ---
+  # The event log is the input to the lag analysis, so these decide how that analysis
+  # sees the world. Too long a quiet window merges the afternoon's storms into the
+  # morning's; too short splits one storm in two. Tune against observed storms.
+  storm_start_rain_1h_in: 0.10       # on-site OR upstream 1 h rain that opens an event
+  storm_continue_rain_1h_in: 0.02    # below this the storm counts as paused
+  storm_quiet_hours: 6               # ...and after this long paused, it has ended
   google_floods_api_key: ""
   wu_api_key: ""
   # NWM/NHDPlus reach carrying Ackerly Creek at the sensor site. The reach's own
@@ -72,6 +79,9 @@ schema:
   mqtt_base_topic: str
   publish_prefix: str
   min_events_for_ml: int(1,100)
+  storm_start_rain_1h_in: float(0.01,2.0)
+  storm_continue_rain_1h_in: float(0.0,1.0)
+  storm_quiet_hours: float(0.5,24.0)
   google_floods_api_key: password?
   wu_api_key: password?
   nwm_reach_id: str?

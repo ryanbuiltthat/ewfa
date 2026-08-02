@@ -440,8 +440,13 @@ IDs — `sensor.ackerly_creek_modeling_creek_flood_probability`.
 The soil-moisture mean, the ponding flag and the sensor-fault watchdogs were migrated here
 too: the add-on already computed the first two, and it can see source liveness and input
 freshness that an HA template cannot. `creek_warning.yaml` is down to the two things that
-must stay HA-side — the tier notification automation (it calls `persistent_notification`) and
-the add-on's own liveness watchdog, since a service cannot report its own death.
+must stay HA-side — the tier notification automation (it calls `persistent_notification` and
+the companion-app notify services) and the add-on's own liveness watchdog, since a service
+cannot report its own death. That automation now covers the first two rungs of §6's
+escalation ladder: a UI notification at every tier, and a critical push — Android
+`alarm_stream`, audible through Do Not Disturb — at or above a configurable tier,
+defaulting to 2 (Watch) because 3-4 cannot fire until the creek gauge is mounted. TTS and
+any wider wake-the-house action remain unbuilt pending §8's dry-run requirement.
 
 ### B.2 Model registry (`/data/models/registry.json`)
 

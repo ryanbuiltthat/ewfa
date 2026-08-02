@@ -3,6 +3,69 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.14.1
+
+- **Alert tier changes now push to the companion app, critically** — until now the tier
+  automation only posted a notification inside the Home Assistant UI, which nobody is
+  looking at when it matters.
+
+  Targets are a configurable list at the top of the automation (`notify_targets`), so
+  more phones are one line each, and the push fans out with `continue_on_error` — one
+  offline or misspelled target must never stop the others being told.
+
+  At or above `critical_from_tier` the push goes out on Android's `alarm_stream` channel,
+  which is what carries the sound through silent, vibrate and Do Not Disturb, and it
+  sticks on screen until acknowledged. **The default is tier 2 (Watch), not 3 (Warning),
+  deliberately:** tiers 3-4 need the creek gauge, which is not mounted, so a floor of 3
+  would mean no critical alert could physically fire — the feature would look wired up
+  and never make a sound. Watch is the most urgent tier reachable today, and in a basin
+  where rainfall-to-crest is tens of minutes (spec §1) it is the one worth waking for.
+
+  A constant `tag` means each tier change *replaces* the previous notification instead of
+  stacking; the all-clear overwrites the alarm rather than sitting beneath it. The alert
+  text is read from the triggering state rather than re-read from the entity, which was a
+  latent race: the tier can move on before the actions run, and the push would then name
+  a tier different from the one that fired it.
+
+  Seven tests in `test_alert_notifications.py` pin the parts that would silently render
+  this useless — no targets, a critical floor above any reachable tier, a channel that is
+  not the alarm stream, a fan-out that stops at the first dead phone.
+  - This is in the HA package, so it does **not** arrive with an add-on update — re-copy
+    `ha-packages/creek_warning.yaml` into your HA config directory and reload automations.
+  - **Confirm it out loud once, before relying on it.** Android's Do Not Disturb must be
+    allowing alarms through for `alarm_stream` to be audible. That is the default, but it
+    is a device-side setting this repo cannot set or verify — see DOCS.md.
+
+## 0.14.0
+
+- **Fixed: a restart mid-storm could close the storm on the next lull, and stamp it as
+  having ended the moment it began.** The quiet clock — the "how long since it last
+  rained" that decides when an event ends — was an instance attribute, so a restart reset
+  it to `None` and the fallback became the storm's own `started_ts`. For any storm open
+  longer than the quiet window (an ordinary all-day rain), that fallback read as a full
+  window of quiet *already elapsed*, so the first sample below the pause threshold closed
+  the event immediately. It then recorded `ended_ts = started_ts`: a storm of zero
+  duration, in the record the lag analysis is built from.
+
+  The anchor now lives on the row (`last_rain_ts`, added by the usual additive
+  migration), so it survives restarts, and the event still ends when the rain stopped
+  rather than when the service noticed. A row with no anchor — one opened by the older
+  code, including a storm open at upgrade time — is treated as *unknowable* rather than
+  as quiet-since-onset: the clock restarts instead of closing on a guess. Four tests
+  cover it, each verified to fail against the previous implementation.
+
+- **Storm detection thresholds are now add-on options**, because they define what counts
+  as one storm and that cannot be settled without storms on record: `storm_start_rain_1h_in`
+  (default 0.10 in/h), `storm_continue_rain_1h_in` (0.02), `storm_quiet_hours` (6). Too
+  long a quiet window merges an afternoon's storms into the morning's; too short splits
+  one storm in two. Either way the lag it teaches is wrong, so they belong in the UI
+  rather than in the source. The configured values are logged at startup.
+
+  Note what this cannot fix: the close test takes the *stronger* of the on-site and
+  upstream 1 h rain, so a single stuck PWS reporting a phantom rain rate holds every
+  storm open indefinitely — the quiet clock never starts, and no window length helps.
+  The runbook now says how to spot that.
+
 ## 0.13.0
 
 - **NEXRAD storm-cell tracking (slice 2g)** — inbound-cell early warning from KBGM's

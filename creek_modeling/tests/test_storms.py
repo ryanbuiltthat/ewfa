@@ -121,6 +121,92 @@ def test_a_restart_mid_storm_resumes_the_open_event():
     assert reopened.count(completed_only=False) == 1
 
 
+def test_a_restart_does_not_close_a_storm_that_is_still_raining_itself_out():
+    """The regression: the quiet clock used to be an instance attribute, so a restart
+    reset it to None and the fallback became the storm's own *start* time. Once a storm
+    had been open longer than the quiet window -- an ordinary all-day rain -- that
+    fallback read as a window's worth of quiet already elapsed, and the first lull after
+    the restart closed the event on the spot.
+
+    The storm here rains steadily for seven hours (past the six-hour window), so the
+    restart lands in exactly that trap."""
+    d = Path(tempfile.mkdtemp())
+    first = StormLog(d)
+    for h in range(8):
+        first.observe(row(T0 + h * HOUR, rain=0.5))
+
+    reopened = StormLog(d)
+    # A five-minute lull. The rain stopped five minutes ago, not six hours ago.
+    assert reopened.observe(row(T0 + 7 * HOUR + 300, rain=0.0)) is None
+    assert reopened.count() == 0
+    assert reopened.latest()["ended_ts"] is None
+
+
+def test_a_restart_does_not_collapse_a_long_storms_end_back_onto_its_onset():
+    """The other half of the same bug: it closed with ended_ts = row.ts - since, and with
+    started_ts standing in as the anchor that is started_ts exactly. A storm that rained
+    for three hours got stamped as having ended the moment it began -- a poisoned row in
+    the very record the lag analysis learns from."""
+    d = Path(tempfile.mkdtemp())
+    first = StormLog(d)
+    for h in (0, 1, 2, 3):                    # it rains steadily for three hours
+        first.observe(row(T0 + h * HOUR, rain=0.5))
+    reopened = StormLog(d)                    # restart, then it tapers off
+    reopened.observe(row(T0 + 3 * HOUR + 300, rain=0.0))
+    reopened.observe(row(T0 + 3 * HOUR + st.END_QUIET_SECONDS + 60, rain=0.0))
+
+    event = reopened.latest()
+    assert event["ended_ts"] is not None, "should have closed by now"
+    assert event["ended_ts"] == T0 + 3 * HOUR, event      # when the rain actually stopped
+    assert event["ended_ts"] - event["started_ts"] == 3 * HOUR
+
+
+def test_the_quiet_clock_survives_a_restart_rather_than_starting_over():
+    """A restart must neither extend nor truncate the storm: the clock is anchored on the
+    last *rain*, so quiet accrued before the restart still counts, and the recorded end is
+    when the rain stopped rather than when the storm began."""
+    d = Path(tempfile.mkdtemp())
+    first = StormLog(d)
+    first.observe(row(T0, rain=0.5))
+    first.observe(row(T0 + 2 * HOUR, rain=0.5))       # rain stops here
+    first.observe(row(T0 + 3 * HOUR, rain=0.0))       # 1 h of quiet, then we restart
+    reopened = StormLog(d)
+    # 6 h total since the rain stopped, so this closes -- and it ended at T0 + 2 h, not
+    # at T0, which is what anchoring on started_ts would have recorded.
+    assert reopened.observe(row(T0 + 8 * HOUR, rain=0.0)) == "closed"
+    assert reopened.latest()["ended_ts"] == T0 + 2 * HOUR
+
+
+def test_a_legacy_row_with_no_anchor_restarts_the_clock_rather_than_closing():
+    """Rows opened by the version that kept the clock in memory have last_rain_ts NULL.
+    That is unknowable, not quiet-since-onset -- closing on it would fabricate the very
+    zero-length record this fixes, on the storm open at upgrade time."""
+    d = Path(tempfile.mkdtemp())
+    s = StormLog(d)
+    s.observe(row(T0, rain=0.5))
+    with sqlite3.connect(d / "events.sqlite") as con:
+        con.execute("UPDATE storm_events SET last_rain_ts = NULL")
+
+    s = StormLog(d)
+    assert s.observe(row(T0 + 12 * HOUR, rain=0.0)) is None   # would have closed before
+    assert s.count() == 0
+    # The clock is now anchored, so the window runs from here.
+    assert s.observe(row(T0 + 12 * HOUR + st.END_QUIET_SECONDS + 60, rain=0.0)) == "closed"
+
+
+def test_the_detection_thresholds_are_tunable():
+    """They are add-on options because they define what counts as one storm, and that
+    cannot be settled without storms on record."""
+    d = Path(tempfile.mkdtemp())
+    s = StormLog(d, None, start_rain_1h_in=0.5, continue_rain_1h_in=0.2,
+                 quiet_seconds=2 * HOUR)
+    assert s.observe(row(T0, rain=0.3)) is None            # under the custom open bar
+    assert s.observe(row(T0 + 300, rain=0.6)) == "opened"
+    assert s.observe(row(T0 + 600, rain=0.3)) is None       # still raining by this config
+    # 2 h of quiet is enough here, where the default would still be holding the storm open.
+    assert s.observe(row(T0 + 600 + 2 * HOUR, rain=0.1)) == "closed"
+
+
 def test_annotation_is_preserved():
     s = make()
     s.observe(row(T0, rain=0.5))

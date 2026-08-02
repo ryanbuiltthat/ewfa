@@ -2,8 +2,11 @@
 
 What to do when a storm hits. Checklist form — meant to be readable on a phone at 2 am.
 
-> **ewfa will not wake you.** Alerts are persistent notifications in the HA UI only.
-> No push, no TTS (uncalibrated thresholds — spec §8 requires dry-run testing first).
+> **ewfa now pushes to your phone — but do not treat it as your alarm clock.** Tier 2
+> (Watch) and above send a critical push on Android's alarm stream, which sounds through
+> silent and Do Not Disturb; below that, an ordinary notification. It has to be tested on
+> your own phone with DND actually on before it counts as an alarm (DOCS.md says how),
+> and the thresholds behind it are still uncalibrated. No TTS, nothing else in the house.
 > **NWS/NOAA is still your real alerting path.** This is a data-collection aid.
 
 > **Tier 4 cannot fire yet.** The SEN0676 radar isn't mounted, so tiers 3–4 are dormant
@@ -46,7 +49,8 @@ Time-stamped phone photos count as all of the above.
 
 ## After — next day
 
-Storm events don't close until 6 h of quiet, so do this the following day.
+Storm events don't close until the quiet window has elapsed (6 h by default —
+`storm_quiet_hours` in the add-on options), so do this the following day.
 
 - [ ] **Operator tab → Storms & lag → "Ready to annotate"** — confirm it names the storm
       you watched (`Storm #<n>`), then type the times from *During* into **"↳ notes"** and
@@ -54,7 +58,13 @@ Storm events don't close until 6 h of quiet, so do this the following day.
 
   It targets the most recent **closed** storm, not just the newest row, so it's still
   right even if a second storm has already opened since. If it says `none yet`, nothing
-  has closed — wait for the 6 h quiet window, or check Storm In Progress.
+  has closed — wait out the quiet window, or check Storm In Progress.
+
+  If a storm *never* closes, the quiet clock is being held open by a rain signal that
+  never reaches zero. Check the history of **Rain (1 h)** and **Upstream rain (1 h)**
+  across a dry stretch: a stuck upstream PWS reporting a phantom rain rate holds every
+  storm open forever, since either gauge alone can keep the event alive. Shortening
+  `storm_quiet_hours` will not fix that — the clock never starts.
 
 - [ ] **Only if you need something the text box can't do** — annotating an *older*
       un-annotated storm, or correcting a note already saved — use SQL directly. From the
@@ -91,7 +101,7 @@ Either way, put the times from *During* in the notes. That's what calibrates the
 
 | | |
 |---|---|
-| Storm detection | opens at 0.10 in/h rain (on-site or upstream), closes after 6 h quiet |
+| Storm detection | opens at 0.10 in/h rain (on-site or upstream), closes after 6 h quiet — all three tunable (`storm_start_rain_1h_in`, `storm_continue_rain_1h_in`, `storm_quiet_hours`) |
 | Event log | peaks + onset conditions written to `/share/creek_modeling/events.sqlite`, survives restarts |
 | Tier evaluation | every 5 min; active NWS products floor the tier |
 | Dataset | JSONL parts per fast loop, consolidated to Parquet nightly |

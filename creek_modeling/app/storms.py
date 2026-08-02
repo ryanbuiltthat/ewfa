@@ -33,7 +33,11 @@ SHARE_SUBDIR = "creek_modeling"
 # — but the CLI's default is to fail instantly with "database is locked" rather than wait.
 BUSY_TIMEOUT_MS = 5000
 
-# PLACEHOLDER thresholds — a small flashy basin (§1), tune once storms are on record.
+# Defaults for a small flashy basin (§1). These are the *defaults* only — all three are
+# add-on options (`storm_start_rain_1h_in`, `storm_continue_rain_1h_in`,
+# `storm_quiet_hours`), because they are the knobs that decide what counts as one storm
+# and they cannot be settled without storms on record. Detection is the input to the lag
+# analysis, so getting them wrong quietly distorts every event the log holds.
 START_RAIN_1H_IN = 0.10        # on-site or upstream: rain is meaningfully falling
 CONTINUE_RAIN_1H_IN = 0.02     # below this the storm is considered to have paused
 END_QUIET_SECONDS = 6 * 3600   # ...and after this long paused, it has ended
@@ -53,6 +57,9 @@ _PEAKS = {
 _SCHEMA = {
     "started_ts": "REAL NOT NULL",
     "ended_ts": "REAL",
+    # Last sample that still had meaningful rain — the anchor the quiet clock counts from.
+    # On the row rather than in memory because the process restarts mid-storm; see observe().
+    "last_rain_ts": "REAL",
     "max_24h_rain_in": "REAL",
     "max_24h_upstream_rain_in": "REAL",
     "api_at_onset_in": "REAL",
@@ -103,12 +110,25 @@ def _resolve_db_path(data_dir: Path, share_dir: Path | None) -> Path:
 class StormLog:
     """Detects storm events from the feature stream and records them in SQLite."""
 
-    def __init__(self, data_dir: Path, share_dir: Path | None = None):
+    def __init__(self, data_dir: Path, share_dir: Path | None = None,
+                 start_rain_1h_in: float = START_RAIN_1H_IN,
+                 continue_rain_1h_in: float = CONTINUE_RAIN_1H_IN,
+                 quiet_seconds: float = END_QUIET_SECONDS):
         self._path = _resolve_db_path(data_dir, share_dir)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
-        self._last_rain_ts: float | None = None   # last sample with meaningful rain
-        log.info("Storm event log at %s", self._path)
+        self._start_rain = start_rain_1h_in
+        self._continue_rain = continue_rain_1h_in
+        self._quiet_seconds = quiet_seconds
+        if continue_rain_1h_in > start_rain_1h_in:
+            # Not fatal, but it means a storm pauses the instant it opens: rain heavy
+            # enough to start one is already below the bar for continuing it.
+            log.warning("storm_continue_rain_1h_in (%.3f) exceeds storm_start_rain_1h_in "
+                        "(%.3f) — every event will pause immediately",
+                        continue_rain_1h_in, start_rain_1h_in)
+        log.info("Storm event log at %s (open >= %.2f in/h, pause < %.2f in/h, "
+                 "close after %.1f h quiet)", self._path, self._start_rain,
+                 self._continue_rain, self._quiet_seconds / 3600)
 
     @property
     def path(self) -> Path:
@@ -146,24 +166,34 @@ class StormLog:
         open_event = self._open_event()
 
         if open_event is None:
-            if rain >= START_RAIN_1H_IN:
+            if rain >= self._start_rain:
                 self._open(row)
-                self._last_rain_ts = row.ts
                 log.info("Storm event opened (rain %.2f in/h)", rain)
                 return "opened"
             return None
 
-        self._accumulate(open_event, row, alert_tier)
-        if rain >= CONTINUE_RAIN_1H_IN:
-            self._last_rain_ts = row.ts
+        raining = rain >= self._continue_rain
+        anchor = open_event["last_rain_ts"]
+
+        # The quiet clock is anchored on the row, not in memory. It used to be an
+        # instance attribute, which a restart mid-storm reset to None — the fallback
+        # was then the storm's own start time, so the next quiet sample measured hours
+        # of "quiet" and closed the event with ended_ts == started_ts: a zero-length
+        # storm, and a poisoned lag record. A missing anchor (a row opened before this
+        # column existed, or by that older code) is treated as unknowable rather than as
+        # quiet-since-onset: the clock restarts here instead of closing on a guess.
+        touch = row.ts if (raining or anchor is None) else None
+        self._accumulate(open_event, row, alert_tier, touch)
+        if raining or anchor is None:
             return None
 
         # Quiet: close only once it has been quiet long enough to be a separate storm.
-        since = row.ts - (self._last_rain_ts or open_event["started_ts"])
-        if since >= END_QUIET_SECONDS:
-            self._close(open_event["id"], row.ts - since)
-            self._last_rain_ts = None
-            log.info("Storm event %d closed", open_event["id"])
+        since = row.ts - anchor
+        if since >= self._quiet_seconds:
+            # Ends when the rain stopped, not when we noticed — the quiet window itself
+            # is not part of the storm.
+            self._close(open_event["id"], anchor)
+            log.info("Storm event %d closed (%.1f h quiet)", open_event["id"], since / 3600)
             return "closed"
         return None
 
@@ -176,16 +206,23 @@ class StormLog:
     def _open(self, row) -> None:
         with self._connect() as con:
             con.execute(
-                "INSERT INTO storm_events (started_ts, api_at_onset_in, soil_at_onset_pct,"
-                " swe_at_onset_in, rain_on_snow, max_24h_rain_in, max_24h_upstream_rain_in)"
-                " VALUES (?,?,?,?,?,0,0)",
-                (row.ts, row.api_index_in, row.soil_moisture_mean_pct,
+                "INSERT INTO storm_events (started_ts, last_rain_ts, api_at_onset_in,"
+                " soil_at_onset_pct, swe_at_onset_in, rain_on_snow, max_24h_rain_in,"
+                " max_24h_upstream_rain_in) VALUES (?,?,?,?,?,?,0,0)",
+                (row.ts, row.ts, row.api_index_in, row.soil_moisture_mean_pct,
                  row.snow_water_equivalent_in, 1 if row.rain_on_snow_flag else 0),
             )
 
-    def _accumulate(self, event: sqlite3.Row, row, alert_tier: int | None) -> None:
-        """Update running peaks and storm totals."""
+    def _accumulate(self, event: sqlite3.Row, row, alert_tier: int | None,
+                    last_rain_ts: float | None = None) -> None:
+        """Update running peaks and storm totals, and re-anchor the quiet clock.
+
+        `last_rain_ts` rides along in the same UPDATE rather than in a write of its own —
+        this runs every fast loop for the life of a storm.
+        """
         updates: dict[str, float] = {}
+        if last_rain_ts is not None:
+            updates["last_rain_ts"] = last_rain_ts
         for column, feature in _PEAKS.items():
             value = alert_tier if feature is None else getattr(row, feature, None)
             if value is None:
