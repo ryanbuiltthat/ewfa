@@ -3,6 +3,38 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.14.3
+
+- **Fixed: 0.14.2's device-action push also failed to load** — Home Assistant reported
+  `Unknown device '{{ repeat.item }}'` and the automation was disabled outright, same as
+  0.14.1's failure before it. The cause was structural, not a naming mistake this time:
+  Home Assistant resolves a device action's `device_id` when the automation is *set up*,
+  before any per-iteration template rendering happens. The literal string
+  `"{{ repeat.item }}"` was therefore never evaluated as a template at all — it errored
+  as a malformed device id. `repeat`/`for_each` cannot drive a device action's
+  `device_id`; only the payload around it (`title`, `message`, `data`) can be templated.
+
+  Each phone is now one explicit, non-templated action — the same static-per-instance
+  shape a real, working blueprint actually emits (confirmed by reading
+  SgtBatten/HA_blueprints' Frigate notifications, which never templates `device_id`
+  either). Content is shared between the two phones with a plain YAML anchor
+  (`&creek_push` / `<<: *creek_push`) rather than a runtime loop, so the notification
+  text and critical-alert payload are still written once, not duplicated per phone.
+
+  Three tests target this specific failure mode: `device_id` must never contain a Jinja
+  template, no `repeat` step may appear anywhere in the actions (a structural guard, not
+  just a content check), and every configured phone must have its own independent
+  action. All three were verified to fail against a reconstruction of the 0.14.2 shape.
+  Templates were also hand-rendered end-to-end for both phones and both a quiet and a
+  critical tier before committing, rather than trusted to merely parse.
+
+  Adding a phone is now: copy one whole action block, change its `device_id`. There is
+  no longer a separate `notify_targets` list to keep in sync with — the action blocks
+  are the only configuration surface, so there is nothing left to drift.
+  - Re-copy `ha-packages/creek_warning.yaml` yet again — this is the third time in a
+    row, and the last one: the automation is now covered by tests that catch this exact
+    class of failure before it ships.
+
 ## 0.14.2
 
 - **Fixed: 0.14.1's companion-app push failed outright** — Home Assistant reported

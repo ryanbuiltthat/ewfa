@@ -32,22 +32,34 @@ Two things still need a **one-time** manual setup (they can't come from the add-
      packages: !include_dir_named ha-packages
    ```
 
-   **Set your phones** in the `CONFIGURE NOTIFICATIONS HERE` block at the top of the
-   `creek_tier_change` automation — one Home Assistant **device id** per line (not a
-   `notify.` service name; companion-app phones don't have a fixed, guessable one, which
-   is exactly what shipped broken in 0.14.1). Find a phone's id at Settings → Devices &
-   Services → Devices → click the phone → the URL ends `.../config/devices/device/<id>`:
+   **Set your phones** under "Companion app" near the bottom of the `creek_tier_change`
+   automation. Each phone is its own action block, identified by Home Assistant
+   **device id** — not a `notify.` service name (companion-app phones don't have a
+   fixed, guessable one) and not a list to append to (a templated device id doesn't
+   work — Home Assistant resolves it before the template engine ever runs; both of those
+   are what shipped broken in 0.14.1 and 0.14.2). Find a phone's id at Settings →
+   Devices & Services → Devices → click the phone → the URL ends
+   `.../config/devices/device/<id>`:
 
    ```yaml
-   notify_targets:
-     - efa8fde8c961dd7d5c23feda71661457   # add as many phones as you like
-     - 3b510b04ed78e8ef686a358daa0cc84d
-   critical_from_tier: 2                  # 2 = Watch. Raise to 3 once the gauge is in
+   - &creek_push
+     domain: mobile_app
+     type: notify
+     # ...title/message/data...
+     device_id: efa8fde8c961dd7d5c23feda71661457   # Ryan's phone
+   - <<: *creek_push
+     device_id: 3b510b04ed78e8ef686a358daa0cc84d   # Kelly's phone
    ```
 
-   At or above `critical_from_tier` the push goes out on Android's `alarm_stream`
-   channel, so it sounds at alarm volume through silent and vibrate and stays on screen
-   until dismissed. Below it, an ordinary notification.
+   **To add a phone:** copy one whole block (the `- <<: *creek_push` line and its
+   `device_id:`), paste it as a new list item, and set its device id. The
+   `&creek_push`/`<<: *creek_push` pair is a plain YAML anchor — it shares the
+   notification content so it's written once, not once per phone.
+
+   `critical_from_tier` (in the automation's variables, near the top) sets which tier
+   makes the push CRITICAL: at or above it, the push goes out on Android's
+   `alarm_stream` channel, so it sounds at alarm volume through silent and vibrate and
+   stays on screen until dismissed. Below it, an ordinary notification.
 
    > **Do Not Disturb, and the one thing this repo cannot do for you.** `alarm_stream`
    > carries the alert through DND *because Android treats it as an alarm* — which works
