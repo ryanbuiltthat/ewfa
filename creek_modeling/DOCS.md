@@ -145,6 +145,7 @@ Set these on the **Configuration** tab.
 | `snodas_swe` | `true` | Daily SNODAS snow-water-equivalent for the site cell (free, no key) |
 | `nexrad_cells` | `true` | NEXRAD storm-cell tracks via IEM (free, no key) — inbound-cell ETA for storms approaching from the W/NW, where the upstream gauges cannot lead |
 | `nexrad_radar_id` | `KBGM` | The WSR-88D covering the site (Binghamton) |
+| `wpc_ero` | `true` | WPC Excessive Rainfall Outlook via IEM (free, no key) — grades forecast rain against flash-flood guidance, i.e. against what the ground can absorb, a day ahead of radar |
 | `onsite_temp_entity` | `sensor.outside_weather_station_outdoors_temp` | Ecowitt; needed for the rain-on-snow flag |
 
 ## How it talks to Home Assistant

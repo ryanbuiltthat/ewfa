@@ -109,6 +109,14 @@ FEATURE_COLUMNS = (
     "nws_flood_watch", "nws_flood_warning", "nws_flash_flood_warning",
     "nws_alert_count",
     "snow_water_equivalent_in", "temp_f", "rain_on_snow_flag",
+    # 2g radar cell tracks. These were published and recorded from 0.13.0 but were
+    # missing here, so the model could not see them — the one input that leads on the
+    # dominant W/NW storm approach was excluded from the thing meant to predict it.
+    "radar_cells_tracked", "radar_threat_cells", "radar_threat_eta_min",
+    "radar_threat_max_dbz",
+    # 2h WPC Excessive Rainfall Outlook. The only input that grades rain against what
+    # the ground can absorb, on a day-scale horizon nothing else here reaches.
+    "wpc_ero_day1_risk", "wpc_ero_day2_risk", "wpc_ero_day3_risk",
 )
 # Cast to 0/1 before handing to xgboost; everything else is already numeric-or-NaN.
 BOOL_COLUMNS = ("ponding_flag", "rain_on_snow_flag")
