@@ -33,13 +33,16 @@ Two things still need a **one-time** manual setup (they can't come from the add-
    ```
 
    **Set your phones** in the `CONFIGURE NOTIFICATIONS HERE` block at the top of the
-   `creek_tier_change` automation — one `notify.` service per line:
+   `creek_tier_change` automation — one Home Assistant **device id** per line (not a
+   `notify.` service name; companion-app phones don't have a fixed, guessable one, which
+   is exactly what shipped broken in 0.14.1). Find a phone's id at Settings → Devices &
+   Services → Devices → click the phone → the URL ends `.../config/devices/device/<id>`:
 
    ```yaml
    notify_targets:
-     - notify.ryanphone
-     - notify.mobile_app_someone_else   # add as many as you like
-   critical_from_tier: 2                # 2 = Watch. Raise to 3 once the gauge is in
+     - efa8fde8c961dd7d5c23feda71661457   # add as many phones as you like
+     - 3b510b04ed78e8ef686a358daa0cc84d
+   critical_from_tier: 2                  # 2 = Watch. Raise to 3 once the gauge is in
    ```
 
    At or above `critical_from_tier` the push goes out on Android's `alarm_stream`
