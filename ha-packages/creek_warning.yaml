@@ -83,28 +83,50 @@ automation:
       critical_from_tier: 2
       # ============================================================================
 
-      tier: "{{ trigger.to_state.state | int(0) }}"
-      # Read from the triggering state, not from states()/state_attr(): by the time the
-      # actions run the entity may already have moved on, and the alert would then
-      # describe a tier different from the one that fired it.
-      label: "{{ trigger.to_state.attributes.get('label') or 'alert' }}"
-      why: "{{ trigger.to_state.attributes.get('why') or 'No reason reported.' }}"
-      is_critical: "{{ (trigger.to_state.state | int(0)) >= critical_from_tier }}"
+      alert_entity: sensor.ackerly_creek_modeling_creek_alert_tier
+
+      # A MANUAL run has no `trigger` variable at all — not an empty one, absent. That
+      # includes Developer tools -> Actions -> automation.trigger, which is the only way
+      # to test this without waiting for a storm and is what spec §8's dry-run
+      # requirement means in practice. Every field below therefore falls back to reading
+      # the entity live.
+      #
+      # Without that fallback, rendering raises "UndefinedError: 'trigger' is undefined"
+      # while the variables are still being built — before the first action, before the
+      # persistent notification, before anything reaches a phone. The automation simply
+      # does nothing and leaves almost no trace. That shipped in 0.14.1-0.14.3 and is
+      # precisely what "I tested it and nothing happened" looked like from the outside.
+      #
+      # When a trigger IS present it still wins, so a real alert describes the state that
+      # fired it rather than whatever the entity has since moved on to.
+      from_trigger: "{{ trigger is defined and trigger.to_state is defined }}"
+      tier: >-
+        {{ (trigger.to_state.state if from_trigger else states(alert_entity)) | int(0) }}
+      label: >-
+        {{ (trigger.to_state.attributes.get('label') if from_trigger
+            else state_attr(alert_entity, 'label')) or 'alert' }}
+      why: >-
+        {{ (trigger.to_state.attributes.get('why') if from_trigger
+            else state_attr(alert_entity, 'why')) or 'No reason reported.' }}
+      is_critical: "{{ tier >= critical_from_tier }}"
       push_title: >-
-        {{ 'Creek all-clear' if (trigger.to_state.state | int(0)) == 0
-           else 'Creek ' ~ (trigger.to_state.attributes.get('label') or 'alert')
-                ~ ' (Tier ' ~ trigger.to_state.state ~ ')' }}
+        {{ 'Creek all-clear' if tier == 0
+           else 'Creek ' ~ label ~ ' (Tier ' ~ tier ~ ')' }}
     triggers:
       - trigger: state
         entity_id: sensor.ackerly_creek_modeling_creek_alert_tier
     conditions:
-      # Ignore startup/unavailable churn and the MQTT LWT flipping the entity.
+      # Ignore startup/unavailable churn and the MQTT LWT flipping the entity. A manual
+      # run has no trigger to inspect and must never be filtered out — that is the dry
+      # run. Conditions are skipped by default on automation.trigger, but this stays
+      # correct if someone passes skip_condition: false.
       - condition: template
         value_template: >
-          {{ trigger.to_state.state not in ['unknown', 'unavailable']
-             and trigger.from_state is not none
-             and trigger.from_state.state not in ['unknown', 'unavailable']
-             and trigger.to_state.state != trigger.from_state.state }}
+          {{ not from_trigger
+             or (trigger.to_state.state not in ['unknown', 'unavailable']
+                 and trigger.from_state is not none
+                 and trigger.from_state.state not in ['unknown', 'unavailable']
+                 and trigger.to_state.state != trigger.from_state.state) }}
     actions:
       # --- Home Assistant UI ---
       - choose:
