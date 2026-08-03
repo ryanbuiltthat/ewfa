@@ -65,6 +65,39 @@ def test_onsite_rain_is_a_watch():
     assert compute_tier(row(rain_6h_in=1.2), 0.0)[0] == 2
 
 
+def test_a_moderate_wpc_outlook_is_an_advisory_on_its_own():
+    """WPC has already graded the rain against what the ground can absorb, so Moderate+
+    needs no corroboration from our own instruments."""
+    tier, label, reasons = compute_tier(row(wpc_ero_day1_risk=3.0), 0.0)
+    assert (tier, label) == (1, "Advisory")
+    assert "Moderate" in reasons[0]
+
+
+def test_a_slight_wpc_outlook_needs_wet_ground():
+    # Slight over dry ground is a summer commonplace -- it must not fire alone, or
+    # Advisory becomes the permanent state and stops meaning anything.
+    assert compute_tier(row(wpc_ero_day1_risk=2.0), 0.0)[0] == 0
+    # ...but the same outlook onto saturated ground is the real setup.
+    tier, _, reasons = compute_tier(
+        row(wpc_ero_day1_risk=2.0, soil_moisture_mean_pct=75.0), 0.0)
+    assert tier == 1
+    assert "Slight" in reasons[0] and "wet ground" in reasons[0]
+    # The basin-wide index is an equally good route, so a dead probe cannot mask it.
+    assert compute_tier(row(wpc_ero_day1_risk=2.0, api_index_in=2.5), 0.0)[0] == 1
+
+
+def test_a_marginal_outlook_never_fires_and_missing_never_fires():
+    assert compute_tier(row(wpc_ero_day1_risk=1.0, soil_moisture_mean_pct=90.0), 0.0)[0] == 0
+    assert compute_tier(row(wpc_ero_day1_risk=0.0), 0.0)[0] == 0
+    assert compute_tier(row(wpc_ero_day1_risk=None), 0.0)[0] == 0
+
+
+def test_the_forecast_days_beyond_today_do_not_drive_the_tier():
+    """Days 2-3 are model features, not operator alerts -- a High risk two days out is
+    not something to act on tonight, and would leave the tier stuck up for 48 h."""
+    assert compute_tier(row(wpc_ero_day2_risk=4.0, wpc_ero_day3_risk=4.0), 0.0)[0] == 0
+
+
 def test_an_inbound_radar_cell_is_a_watch_before_any_gauge_sees_rain():
     """The 2g slice's whole purpose: on the dominant W/NW approach the upstream gauges
     are geometrically behind the house, so the radar track is the only leading signal."""

@@ -108,6 +108,20 @@ views:
           - entity: sensor.ackerly_creek_modeling_creek_antecedent_precipitation_index
             name: Antecedent precipitation index
 
+      # WPC's Excessive Rainfall Outlook: the only input that grades forecast rain
+      # against what the ground can actually absorb, and the earliest one — it exists
+      # before anything is on radar. Day 1 also floors the alert tier (§6).
+      - type: entities
+        title: Excessive rainfall outlook (WPC)
+        show_header_toggle: false
+        entities:
+          - entity: sensor.ackerly_creek_modeling_creek_wpc_excessive_rain_risk_day_1
+            name: Today
+          - entity: sensor.ackerly_creek_modeling_creek_wpc_excessive_rain_risk_day_2
+            name: Tomorrow
+          - entity: sensor.ackerly_creek_modeling_creek_wpc_excessive_rain_risk_day_3
+            name: Day 3
+
       # Inbound convective cells from KBGM's storm-attribute table. The one leading
       # indicator that works for the dominant W/NW approach, where a cell reaches the
       # house before the SE upstream gauges see any rain. ETA empty = nothing inbound.
@@ -351,3 +365,5 @@ views:
             name: NWS alert feed missing
           - entity: binary_sensor.ackerly_creek_modeling_creek_radar_cells_missing
             name: Radar cell feed missing
+          - entity: binary_sensor.ackerly_creek_modeling_creek_wpc_outlook_missing
+            name: WPC outlook missing

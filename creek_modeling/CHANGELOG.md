@@ -3,6 +3,50 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.16.0
+
+- **WPC Excessive Rainfall Outlook (slice 2h)** — the Weather Prediction Center's day
+  1-3 categorical flood-risk areas (Marginal / Slight / Moderate / High), as a point
+  query via IEM's `outlook_by_point` service. Free, no key, and — the reason this was
+  worth doing at all — **no shapefile parsing and no polygon math**: IEM answers "which
+  outlooks cover this point", so there is no geometry of ours to get subtly wrong.
+
+  This is the only input in the system that grades forecast rain against **flash flood
+  guidance** — against what the ground can currently absorb — instead of reporting rain
+  in inches. Everything else answers "how much water"; the ERO answers "is that much
+  water a problem here, today", folding in antecedent conditions and regional soil state
+  that two buried probes cannot see. It also completes the horizon ladder: the ERO is
+  the **day**-scale signal (it exists before anything is on radar), 2g's cell tracks are
+  the **hour**-scale one, the gauges are the **now**-scale one.
+
+  Day 1 feeds the Advisory tier — Moderate or High on its own, Slight only over
+  already-wet ground, since Slight over dry ground is a summer commonplace and firing on
+  it would make Advisory the permanent state. Days 2-3 are model features only.
+
+  Verified against the live service while writing it: the site was under a **Day-1
+  Slight** during the very storm that had raised the Watch tier, from an outlook issued
+  that morning.
+
+- **Fixed: the radar cell features were never model inputs.** 0.13.0 added
+  `radar_cells_tracked`, `radar_threat_cells`, `radar_threat_eta_min` and
+  `radar_threat_max_dbz` — published to Home Assistant and written to the dataset, but
+  never added to `train.py`'s `FEATURE_COLUMNS`. That list is deliberately explicit so
+  stray columns cannot become inputs by accident, and the cost of that choice is that a
+  new feature is invisible to the model until it is named there. So the one input that
+  leads on the dominant W/NW storm approach was excluded from the thing meant to predict
+  that approach. Both the radar and ERO columns are now inputs; the existing padding
+  logic means datasets predating either column still train.
+
+  Nothing needs retraining by hand — the nightly job picks the new columns up. Rows
+  recorded before this release carry nulls for them, which xgboost handles natively.
+
+- Along with the source: an `ero_outlook_missing` watchdog, three dashboard rows
+  ("Excessive rainfall outlook (WPC)" on Flood Watch), a `wpc_ero` option, and 15 tests.
+  Absent risk areas are recorded as `0.0` (WPC looked and drew nothing — a real
+  low-risk forecast); only an unreadable product is `None`, so the watchdog can tell a
+  quiet day from a broken feed, and an unrecognised future category stays `None` rather
+  than being silently downgraded to "no risk".
+
 ## 0.15.0
 
 - **The Do Not Disturb instructions were wrong, and that is why nothing was audible.**

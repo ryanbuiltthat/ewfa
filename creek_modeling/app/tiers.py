@@ -32,6 +32,7 @@ prompt to go look, not as a validated alarm.
 from __future__ import annotations
 
 from .features import FeatureRow
+from .sources.ero import RISK_LABELS as ERO_LABELS
 
 TIER_LABELS = {
     0: "All-clear",
@@ -49,6 +50,14 @@ ADVISORY_QPF_6H_IN = 0.75          # heavy short-fuse rain earns an advisory on 
 # probes measure two points, the index summarises weeks of rainfall over the whole basin.
 # Either route can raise the advisory, so a failed probe cannot mask a saturated basin.
 ADVISORY_API_INDEX_IN = 2.0
+# WPC Excessive Rainfall Outlook (0 none · 1 MRGL · 2 SLGT · 3 MDT · 4 HIGH). The ERO
+# already folds antecedent conditions and flash-flood guidance into its categories, so
+# Moderate+ is an advisory on its own — WPC is saying flash flooding is likely somewhere
+# in the risk area. Slight is common enough in summer that alone it would make Advisory
+# near-permanent; over ground that is already wet it means today's rain runs off, so it
+# advises only in combination.
+ADVISORY_ERO_ALONE = 3.0        # Moderate or High
+ADVISORY_ERO_WITH_WET_GROUND = 2.0
 
 # --- Rain-on-snow: rain actually falling (rather than forecast) onto a pack ---
 ROS_WATCH_RAIN_1H_IN = 0.05
@@ -106,6 +115,20 @@ def compute_tier(row: FeatureRow, flood_probability: float | None) -> tuple[int,
         reasons.append((1, f"{row.qpf_6h_in:.2f}\" forecast in the next 6 h"))
     if row.ponding_flag:
         reasons.append((1, "low-lying ground already ponding"))
+
+    # --- WPC Excessive Rainfall Outlook (spec Addendum C 2h) ---
+    # The only input that grades rainfall against what the ground can absorb, and the
+    # only one that exists before anything is on radar. Day 1 only: days 2-3 are carried
+    # as features for the model but are too far out to justify an operator-facing tier.
+    ero = row.wpc_ero_day1_risk
+    if _ge(ero, ADVISORY_ERO_ALONE):
+        reasons.append((1, f"WPC {ERO_LABELS.get(ero, ero)} risk of excessive rainfall today"))
+    elif _ge(ero, ADVISORY_ERO_WITH_WET_GROUND) and (
+        _ge(row.soil_moisture_mean_pct, ADVISORY_SOIL_PCT)
+        or _ge(row.api_index_in, ADVISORY_API_INDEX_IN)
+    ):
+        reasons.append((1, f"WPC {ERO_LABELS.get(ero, ero)} risk of excessive rainfall "
+                           f"onto already-wet ground"))
 
     # --- Rain-on-snow (spec §1: a major NEPA flood driver) ---
     # The pack contributes meltwater on top of the rain, so the same QPF produces more

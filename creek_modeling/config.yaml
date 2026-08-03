@@ -1,5 +1,5 @@
 name: Ackerly Creek Modeling
-version: "0.15.0"
+version: "0.16.0"
 slug: creek_modeling
 description: Flood-probability + predicted-stage inference and nightly retrain for Ackerly Creek.
 url: https://github.com/ryanbuiltthat/ewfa
@@ -70,6 +70,10 @@ options:
   # gauges see rain. KBGM (Binghamton) is the radar covering the site.
   nexrad_cells: true
   nexrad_radar_id: "KBGM"
+  # WPC Excessive Rainfall Outlook for the site, via IEM's point service — free, no key.
+  # Grades forecast rain against flash-flood guidance (what the ground can absorb),
+  # which no other source here does, on a day-ahead horizon.
+  wpc_ero: true
   onsite_temp_entity: sensor.outside_weather_station_outdoors_temp
 
 schema:
@@ -96,4 +100,5 @@ schema:
   snodas_swe: bool
   nexrad_cells: bool
   nexrad_radar_id: str?
+  wpc_ero: bool
   onsite_temp_entity: str?

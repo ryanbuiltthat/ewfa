@@ -325,6 +325,23 @@ class DiscoveryPublisher:
                 "state_topic": f"{b}/features",
                 "value_template": "{{ value_json.radar_threat_max_dbz if value_json.radar_threat_max_dbz is not none else none }}",
                 "unit_of_measurement": "dBZ", "icon": "mdi:signal"}),
+            # --- ingested features (Addendum C 2h): WPC Excessive Rainfall Outlook ---
+            # Published as the category name rather than the number: "Slight" is what
+            # WPC says and what the forecast discussion will call it, and an operator
+            # reading a dashboard at 2 a.m. should not have to remember that 2 = Slight.
+            # The numeric value rides along as an attribute for graphing.
+            *(
+                ("sensor", f"creek_wpc_ero_day{d}", {
+                    "name": f"Creek WPC Excessive Rain Risk Day {d}",
+                    "state_topic": f"{b}/features",
+                    "value_template": (
+                        "{% set r = value_json.wpc_ero_day" + str(d) + "_risk %}"
+                        "{{ 'unknown' if r is none else"
+                        " {0: 'None', 1: 'Marginal', 2: 'Slight',"
+                        " 3: 'Moderate', 4: 'High'}.get(r | int, r) }}"),
+                    "icon": "mdi:weather-pouring"})
+                for d in (1, 2, 3)
+            ),
             # --- soil moisture (migrated out of the HA package) ---
             ("sensor", "creek_soil_moisture_mean", {
                 "name": "Creek Soil Moisture Mean",
@@ -358,6 +375,7 @@ class DiscoveryPublisher:
                     ("downstream_gauge_missing", "Downstream Gauge Missing", "mdi:gauge-empty"),
                     ("snowpack_data_missing", "Snowpack Data Missing", "mdi:snowflake-off"),
                     ("radar_cells_missing", "Radar Cells Missing", "mdi:radar"),
+                    ("ero_outlook_missing", "WPC Outlook Missing", "mdi:cloud-off-outline"),
                 )
             ),
             # --- command buttons ---

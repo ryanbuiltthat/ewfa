@@ -72,6 +72,7 @@ class Config:
     snodas_swe: bool = True
     nexrad_cells: bool = True
     nexrad_radar_id: str = "KBGM"
+    wpc_ero: bool = True
     onsite_temp_entity: str | None = None
 
     # MQTT (from service discovery via run.sh)
@@ -110,6 +111,7 @@ class Config:
             snodas_swe=bool(opts.get("snodas_swe", True)),
             nexrad_cells=bool(opts.get("nexrad_cells", True)),
             nexrad_radar_id=opts.get("nexrad_radar_id") or "KBGM",
+            wpc_ero=bool(opts.get("wpc_ero", True)),
             onsite_temp_entity=opts.get("onsite_temp_entity") or None,
             mqtt_host=env.get("MQTT_HOST", "core-mosquitto"),
             mqtt_port=int(env.get("MQTT_PORT", 1883)),

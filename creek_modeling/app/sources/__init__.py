@@ -17,6 +17,7 @@ from pathlib import Path
 from ..config import Config
 from ..ha import HAClient
 from .alerts import NwsAlerts
+from .ero import WpcEro
 from .nwm import NwmReach
 from .nws import NwsQpf
 from .radar_cells import RadarCells
@@ -48,6 +49,8 @@ FEATURE_KEYS = (
     # 2g — NEXRAD storm-cell tracks (inbound-cell early warning)
     "radar_cells_tracked", "radar_threat_cells",
     "radar_threat_eta_min", "radar_threat_max_dbz",
+    # 2h — WPC Excessive Rainfall Outlook (day-scale flood-risk forecast)
+    "wpc_ero_day1_risk", "wpc_ero_day2_risk", "wpc_ero_day3_risk",
 )
 
 
@@ -70,9 +73,12 @@ class SourceCoordinator:
             if cfg.nexrad_cells:
                 self._sources.append(RadarCells(*latlon, cfg.nexrad_radar_id))
                 log.info("NEXRAD cell tracking enabled (radar %s)", cfg.nexrad_radar_id)
+            if cfg.wpc_ero:
+                self._sources.append(WpcEro(*latlon))
+                log.info("WPC Excessive Rainfall Outlook enabled")
         else:
-            log.warning("No lat/lon from HA config — NWS QPF, alerts, SNODAS and "
-                        "NEXRAD cells disabled")
+            log.warning("No lat/lon from HA config — NWS QPF, alerts, SNODAS, "
+                        "NEXRAD cells and WPC ERO disabled")
 
         if cfg.wu_api_key and cfg.upstream_pws_ids:
             self._sources.append(WuUpstream(cfg.wu_api_key, cfg.upstream_pws_ids, data_dir))

@@ -537,6 +537,26 @@ read once from HA `/api/config` — no new option.
   `radar_threat_eta_min`, `radar_threat_max_dbz`. SCIT tracks only discrete cells —
   stratiform shields produce no rows, which is fine: QPF handles those.
 
+- **2h — WPC Excessive Rainfall Outlook (done):** `ero.py` (the Weather Prediction
+  Center's day 1-3 categorical flood-risk areas — Marginal / Slight / Moderate / High —
+  as a point query via IEM's `outlook_by_point` service; free, no key, no shapefile
+  parsing). This is the only input in the system that grades forecast rain against
+  **flash flood guidance** — against what the ground can currently absorb — rather than
+  reporting rain in inches. Everything else answers "how much water"; the ERO answers
+  "is that much water a problem *here, today*", folding in antecedent conditions and
+  soil state that our two probes cannot see basin-wide.
+
+  It also completes the horizon ladder. The ERO is the **day**-scale signal, issued
+  before anything exists on radar; 2g's cell tracks are the **hour**-scale one; the
+  on-site gauge and upstream PWS are the **now**-scale one. Day 1 contributes to the
+  Advisory tier (Moderate+ alone, Slight over already-wet ground); days 2-3 are carried
+  as model features only, since a High risk 48 h out is not something to act on tonight.
+
+  An absent risk area is recorded as 0.0 — WPC looked and drew nothing, which is a real
+  low-risk forecast — while an unreadable product is None, so the watchdog can tell a
+  quiet day from a broken feed. Verified against the live service on 2026-08-02, which
+  returned a Day-1 Slight over the site during the storm that had raised the Watch tier.
+
 Still to build for Phase 2: **Google Flood Forecasting** (`gauges:searchGaugesByArea`, §3)
 — deferred pending API access, and open question #2 stays open with it.
 
