@@ -53,6 +53,22 @@ def automation():
     raise AssertionError("creek_tier_change automation is missing from the package")
 
 
+def script():
+    doc = yaml.safe_load(PACKAGE.read_text(encoding="utf-8"))
+    entry = (doc.get("script") or {}).get("creek_alert_test")
+    if entry is None:
+        raise AssertionError("creek_alert_test dry-run script is missing from the package")
+    return entry
+
+
+def script_steps():
+    """The dry-run script's per-phone device actions."""
+    steps = [s for s in script()["sequence"] if isinstance(s, dict) and "device_id" in s]
+    if not steps:
+        raise AssertionError("the dry-run script sends no push")
+    return steps
+
+
 def render_variables(to_state=None, live=None):
     """Render the automation's `variables:` block the way Home Assistant does -- in
     order, each template able to see the ones defined before it.
@@ -190,7 +206,42 @@ def test_the_push_replaces_rather_than_stacks():
     """A storm walks the tier up and back down repeatedly; without a constant tag each
     step leaves its own notification and the phone fills with stale alarms."""
     for step in push_steps():
-        assert step["data"]["tag"] == "creek_alert_tier"
+        assert step["data"]["tag"] == "{{ push_tag }}"
+    assert automation()["variables"]["push_tag"] == "creek_alert_tier"
+
+
+def test_the_dry_run_script_exists_and_is_genuinely_critical():
+    """§8 requires this be testable without waiting for a storm. The previous procedure
+    -- temporarily set critical_from_tier to 0, reload, test, set it back -- put four
+    steps around the thing being tested, and skipping the first silently downgrades the
+    test to a non-critical all-clear that proves nothing while looking like a failure."""
+    seq = script()["sequence"]
+    v = seq[0]["variables"]
+    assert v["is_critical"] is True
+    assert v["tier"] >= 1, "a tier-0 test would send a quiet all-clear, not an alarm"
+
+
+def test_the_dry_run_reaches_exactly_the_same_phones_as_a_real_alert():
+    """A test that notifies a different set of phones than the alert does is not a test
+    of the alert."""
+    assert {s["device_id"] for s in script_steps()} == \
+           {s["device_id"] for s in push_steps()}
+
+
+def test_the_dry_run_sends_the_same_payload_as_a_real_alert():
+    """The whole point of sharing the YAML anchor: what the test sends must be, by
+    construction, what a real alert sends. Anything that drifted here would validate a
+    notification nobody will ever receive."""
+    real = [{k: v for k, v in s.items() if k != "device_id"} for s in push_steps()]
+    test = [{k: v for k, v in s.items() if k != "device_id"} for s in script_steps()]
+    assert test and real and test[0] == real[0], "dry run has drifted from the real alert"
+
+
+def test_the_dry_run_does_not_clobber_a_live_alert():
+    """Same tag would mean firing the test replaces a real, unacknowledged flood alert
+    on the phone with a message saying no flooding is occurring."""
+    assert script()["sequence"][0]["variables"]["push_tag"] != \
+           automation()["variables"]["push_tag"]
 
 
 def test_title_and_message_are_present_on_the_device_action():

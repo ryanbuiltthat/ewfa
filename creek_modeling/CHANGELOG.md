@@ -3,6 +3,38 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.15.0
+
+- **The Do Not Disturb instructions were wrong, and that is why nothing was audible.**
+  Earlier releases said DND bypass was Android's default and only wanted confirming. The
+  companion app documentation says the opposite: notifications "do not override Do Not
+  Disturb settings" unless a *notification channel* is granted permission to, and that
+  permission can only be given by hand on the phone —
+  Settings → Apps → Home Assistant → Notifications → **alarm_stream** → override Do Not
+  Disturb. No YAML in this repo can set it or read it back. It is now documented as
+  required setup, first, before the test, rather than as a footnote.
+
+  Two consequences are documented with it, because both are silent traps: Android fixes
+  a channel's importance and sound the first time the channel appears and ignores every
+  later change ("only lowering of the importance will work"), and renaming a channel
+  starts a fresh one with no permission — which on the phone is indistinguishable from
+  the alarm having broken.
+
+- **`script.creek_alert_test` — the dry run is now one action.** The previous procedure
+  asked the operator to set `critical_from_tier: 0`, reload, trigger, and set it back.
+  Four steps around the thing being tested, and skipping the first silently turns the
+  test into a *non-critical all-clear* — which proves nothing while looking exactly like
+  a failure, and is the likeliest reason the last round appeared to do nothing.
+
+  The script sends the real critical payload to every configured phone, reusing the same
+  YAML anchor as the alert itself, so what it tests is by construction what a Tier 4
+  sends. It carries its own notification tag, so testing never replaces a live alert on
+  the phone. Four tests hold that contract: the dry run must be genuinely critical, reach
+  exactly the same phones, send a byte-identical payload, and use a different tag.
+
+  Run it from Developer tools → Actions → `script.creek_alert_test`, with DND on. DOCS.md
+  has a symptom table for what each outcome means.
+
 ## 0.14.4
 
 - **Fixed: the alert did nothing when tested — and could not be tested at all.** Every
