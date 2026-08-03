@@ -29,7 +29,9 @@ Run: python creek_modeling/tests/test_alert_notifications.py
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import jinja2
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,6 +51,47 @@ def automation():
         if entry.get("id") == "creek_tier_change":
             return entry
     raise AssertionError("creek_tier_change automation is missing from the package")
+
+
+def render_variables(to_state=None, live=None):
+    """Render the automation's `variables:` block the way Home Assistant does -- in
+    order, each template able to see the ones defined before it.
+
+    `to_state=None` simulates a MANUAL run (Developer tools -> Actions ->
+    automation.trigger): Home Assistant provides no `trigger` variable at all, so any
+    template that reaches for `trigger.to_state` raises UndefinedError and the automation
+    dies before its first action. That is not a hypothetical -- it shipped in
+    0.14.1-0.14.3. `live` is what the entity reads back as, for the fallback path.
+
+    Raises jinja2.UndefinedError if the variables cannot be built, which is the failure
+    being guarded against.
+    """
+    live = live or {"state": "0", "label": "All-clear", "why": "nothing elevated"}
+    env = jinja2.Environment()
+    ctx = {
+        "states": lambda _e: live["state"],
+        "state_attr": lambda _e, attr: live.get(attr),
+    }
+    if to_state is not None:
+        ctx["trigger"] = SimpleNamespace(
+            to_state=SimpleNamespace(state=str(to_state["state"]), attributes=to_state),
+            from_state=SimpleNamespace(state="0", attributes={}),
+        )
+
+    for key, raw in automation()["variables"].items():
+        if not isinstance(raw, str) or "{{" not in raw:
+            ctx[key] = raw
+            continue
+        out = env.from_string(raw).render(**ctx)
+        # Home Assistant parses native types back out of a rendered template.
+        if out in ("True", "False"):
+            ctx[key] = out == "True"
+        else:
+            try:
+                ctx[key] = int(out)
+            except ValueError:
+                ctx[key] = out
+    return ctx
 
 
 def push_steps():
@@ -167,13 +210,45 @@ def test_every_phone_gets_identical_content():
     assert all(s == shared[0] for s in shared), "phones would receive different pushes"
 
 
-def test_the_alert_describes_the_tier_that_fired_it():
-    """Reading states()/state_attr() in the actions is a race: the entity can move on
-    before they run, and the push then names a different tier than the one that fired."""
-    v = automation()["variables"]
-    for key in ("tier", "label", "why", "is_critical"):
-        assert "trigger.to_state" in v[key], f"{key} does not read from the trigger"
-        assert "state_attr(" not in v[key], f"{key} re-reads live state"
+def test_a_manual_run_builds_its_variables_instead_of_dying():
+    """The 0.14.1-0.14.3 failure, and the reason three releases in a row did nothing when
+    tested: a manual run (automation.trigger) has no `trigger` variable, so every
+    template reaching for `trigger.to_state` raised UndefinedError while the variables
+    were still being assembled -- before the first action, before even the persistent
+    notification. The automation appeared to do absolutely nothing.
+
+    A manual run is the only way to test this without waiting for a storm, which spec §8
+    requires, so it has to describe live conditions rather than fall over."""
+    v = render_variables(to_state=None,
+                         live={"state": "2", "label": "Watch", "why": "upstream rain"})
+    assert v["tier"] == 2
+    assert v["label"] == "Watch"
+    assert v["why"] == "upstream rain"
+    assert v["is_critical"] is True
+    assert "Tier 2" in v["push_title"]
+
+
+def test_a_real_trigger_still_describes_the_state_that_fired_it():
+    """The fallback must not cost the original race guard: reading live state when a
+    trigger IS present would let the entity move on before the actions run, and the push
+    would name a tier other than the one that fired. Trigger wins when it exists."""
+    v = render_variables(
+        to_state={"state": "4", "label": "Emergency", "why": "stage 2.60 ft"},
+        live={"state": "0", "label": "All-clear", "why": "nothing elevated"})
+    assert v["tier"] == 4, "fell back to live state despite having a trigger"
+    assert v["label"] == "Emergency"
+    assert v["why"] == "stage 2.60 ft"
+    assert v["is_critical"] is True
+    assert "Emergency" in v["push_title"] and "Tier 4" in v["push_title"]
+
+
+def test_an_all_clear_renders_without_the_alarm():
+    """Tier 0 must not come through as a critical alarm -- an all-clear that sounds like
+    an emergency is worse than none."""
+    v = render_variables(to_state={"state": "0", "label": "All-clear",
+                                   "why": "nothing elevated"})
+    assert v["is_critical"] is False
+    assert v["push_title"] == "Creek all-clear"
 
 
 def main():

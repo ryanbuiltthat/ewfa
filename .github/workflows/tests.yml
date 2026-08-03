@@ -25,12 +25,15 @@ jobs:
       - name: Install dependencies
         # Installing the real requirements.txt doubles as a smoke test of the file the
         # Dockerfile builds from: a bad pin here breaks the add-on build for everyone.
-        # PyYAML is test-only — the service reads JSON options, never YAML — so it is not
-        # in requirements.txt and must be installed separately.
+        # PyYAML and Jinja2 are test-only — the service reads JSON options, never YAML,
+        # and does no templating; both exist here to parse and render the Home Assistant
+        # package's automation, so they are not in requirements.txt and are installed
+        # separately. Adding either to requirements.txt would ship it into the add-on
+        # image for nothing.
         run: |
           python -m pip install --upgrade pip
           pip install -r creek_modeling/requirements.txt
-          pip install pyyaml
+          pip install pyyaml jinja2
 
       - name: Run test suite
         # Each test file is a self-contained script with a main() that raises on failure,

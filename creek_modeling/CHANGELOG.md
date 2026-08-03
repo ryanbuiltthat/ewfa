@@ -3,6 +3,39 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.14.4
+
+- **Fixed: the alert did nothing when tested — and could not be tested at all.** Every
+  variable in the tier automation read `trigger.to_state` unconditionally. A manual run
+  (Developer tools → Actions → `automation.trigger`) provides no `trigger` variable, so
+  rendering raised `UndefinedError: 'trigger' is undefined` while the variables were
+  still being assembled — before the first action, before even the persistent
+  notification. The automation silently did nothing. This was present in 0.14.1 through
+  0.14.3, underneath the two separate device-targeting bugs those releases fixed, so
+  every "re-copy and test" round hit it and reported the same nothing.
+
+  Variables now fall back to reading the entity live when there is no trigger, so a
+  manual run is a real dry run describing current conditions. When a trigger *is*
+  present it still wins, preserving the original guarantee that an alert describes the
+  state that fired it rather than whatever the entity has since moved on to. The
+  trigger-churn condition is guarded the same way, so a manual run is never filtered out.
+
+- **The tests now render the automation instead of only inspecting its shape.** The
+  reason three consecutive releases shipped broken is that every existing test checked
+  structure — is the channel `alarm_stream`, is `device_id` a literal — and all of them
+  passed against all three broken versions. `render_variables()` builds the variables in
+  order the way Home Assistant does, with and without a trigger, and
+  `test_a_manual_run_builds_its_variables_instead_of_dying` reproduces the exact
+  `UndefinedError` against the 0.14.3 file. Two companions check that a real trigger
+  still wins over live state, and that tier 0 does not come through as an alarm.
+  - `pip install pyyaml jinja2` in CI (both test-only; neither belongs in the add-on
+    image).
+  - **The dry-run procedure in DOCS.md was also wrong** and is rewritten: a manual run
+    reports the *current* tier, normally 0, so it sends a quiet all-clear and proves
+    nothing about the alarm path. Temporarily set `critical_from_tier: 0`, reload, test
+    with DND on, then set it back.
+  - Re-copy `ha-packages/creek_warning.yaml`.
+
 ## 0.14.3
 
 - **Fixed: 0.14.2's device-action push also failed to load** — Home Assistant reported

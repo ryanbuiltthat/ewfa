@@ -61,14 +61,27 @@ Two things still need a **one-time** manual setup (they can't come from the add-
    `alarm_stream` channel, so it sounds at alarm volume through silent and vibrate and
    stays on screen until dismissed. Below it, an ordinary notification.
 
-   > **Do Not Disturb, and the one thing this repo cannot do for you.** `alarm_stream`
-   > carries the alert through DND *because Android treats it as an alarm* — which works
-   > only while your DND profile is allowing alarms through. That is Android's default,
-   > but it is a device-side setting no YAML here can set or read back. Test it once for
-   > real: turn DND on, put the phone face-down, and fire the automation manually
-   > (Developer tools → Actions → `automation.trigger`). If it does not wake the room,
-   > check Android Settings → Sound → Do Not Disturb → Alarms. An untested alarm is not
-   > an alarm.
+   **Dry-run test it, once, for real** (spec §8 — an untested alarm is not an alarm).
+   A manual run reads current conditions, which are normally tier 0, so it would send a
+   quiet all-clear and prove nothing about the alarm path. Force it:
+
+   1. Temporarily set `critical_from_tier: 0` in the automation, and reload automations
+      (Developer tools → YAML → Reload automations).
+   2. Turn Do Not Disturb **on**. Put the phone face-down, screen off, in another room.
+   3. Developer tools → Actions → `automation.trigger`, target
+      `automation.creek_alert_tier_changed`, Run.
+   4. Both phones should sound at alarm volume and the notification should stay on
+      screen until dismissed.
+   5. Set `critical_from_tier` back to `2` and reload again.
+
+   If step 4 is silent, the push arrived but Android muted it: check Settings → Sound →
+   Do Not Disturb → Alarms. If *nothing at all* arrives, check Settings → Automations →
+   the automation's trace — a red error there means it failed before sending.
+
+   > **The one thing this repo cannot do for you.** `alarm_stream` carries the alert
+   > through DND *because Android treats it as an alarm* — which holds only while your
+   > DND profile allows alarms through. That is Android's default, but it is a
+   > device-side setting no YAML here can set or read back. Hence the test above.
 
 2. **Dashboard** — copy `dashboards/creek_flood_watch.yaml` → `/config/dashboards/` and
    register it (core Lovelace, keeps your UI dashboards untouched):
