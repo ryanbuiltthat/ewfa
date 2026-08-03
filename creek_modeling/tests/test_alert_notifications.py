@@ -6,8 +6,18 @@ in normal use, so the parts that would silently render it useless -- no targets,
 critical floor set above any tier that can actually fire, a push that does not route
 through the alarm stream -- are pinned here instead.
 
+0.14.1 shipped `action: "{{ repeat.item }}"` against a list of `notify.<name>` strings,
+on the assumption that companion-app phones have a fixed, guessable notify *service*
+name. They do not, reliably -- it failed in Home Assistant with "unknown action:
+notify.ryanphone". The fix (0.14.2) targets phones by Home Assistant *device id* through
+a device action (device_id / domain: mobile_app / type: notify), the same mechanism
+community blueprints (e.g. SgtBatten/HA_blueprints' Frigate notifications) use for this
+exact reason. `test_targets_are_device_ids_not_notify_service_names` pins that so this
+does not quietly regress back to the broken form.
+
 Run: python creek_modeling/tests/test_alert_notifications.py
 """
+import re
 import sys
 from pathlib import Path
 
@@ -15,6 +25,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "ha-packages" / "creek_warning.yaml"
+
+# Home Assistant device ids are a 32-character lowercase hex string.
+DEVICE_ID = re.compile(r"^[0-9a-f]{32}$")
 
 # Highest tier app/tiers.py can emit, and the highest reachable without the creek gauge.
 MAX_TIER = 4
@@ -40,20 +53,37 @@ def push_step():
 def test_there_is_at_least_one_notify_target():
     targets = automation()["variables"]["notify_targets"]
     assert isinstance(targets, list) and targets, targets
-    for t in targets:
-        assert t.startswith("notify."), f"{t} is not a notify service"
+
+
+def test_targets_are_device_ids_not_notify_service_names():
+    """The regression this guards: `notify.<name>` is not a real, callable service for a
+    companion-app phone -- there is no fixed name to template against, and 0.14.1 shipped
+    exactly that assumption and broke ("unknown action: notify.ryanphone"). Targets are
+    Home Assistant device ids."""
+    for t in automation()["variables"]["notify_targets"]:
+        assert DEVICE_ID.match(str(t)), f"{t} does not look like a device id"
+        assert not str(t).startswith("notify."), f"{t} is a notify-service name, not a device id"
 
 
 def test_every_target_is_notified_not_just_the_first():
-    """A plain `action: notify.x` reaches one phone. The fan-out is the whole point of
-    a configurable target list."""
+    """A single hardcoded action reaches one phone. The fan-out is the whole point of a
+    configurable target list."""
     step = push_step()
     assert automation()["actions"][-1]["repeat"]["for_each"] == "{{ notify_targets }}"
-    assert step["action"] == "{{ repeat.item }}"
+    assert step["device_id"] == "{{ repeat.item }}"
+
+
+def test_the_push_is_a_device_action_not_a_templated_service_call():
+    """The fix itself: target the phone by device id through the mobile_app/notify
+    device action, not by templating a notify.<name> service string that may not exist."""
+    step = push_step()
+    assert step["domain"] == "mobile_app"
+    assert step["type"] == "notify"
+    assert "action" not in step, "reverted to calling a templated service name"
 
 
 def test_one_dead_target_does_not_silence_the_rest():
-    """An unavailable or misspelled notify service raises. Without continue_on_error the
+    """An unavailable or misconfigured device raises. Without continue_on_error the
     automation aborts there and every target after it in the list is never told."""
     assert push_step()["continue_on_error"] is True
 
@@ -71,7 +101,7 @@ def test_the_critical_floor_is_reachable_today():
 def test_a_critical_push_routes_through_the_alarm_stream():
     """`alarm_stream` is what carries the sound through silent, vibrate and Do Not
     Disturb. Any other channel and a Warning at 3 a.m. is a silent notification."""
-    data = push_step()["data"]["data"]
+    data = push_step()["data"]
     assert "alarm_stream" in data["channel"], data["channel"]
     assert "is_critical" in data["channel"], "the channel must depend on the tier"
     assert data["ttl"] == 0            # past Doze batching
@@ -81,7 +111,16 @@ def test_a_critical_push_routes_through_the_alarm_stream():
 def test_the_push_replaces_rather_than_stacks():
     """A storm walks the tier up and back down repeatedly; without a constant tag each
     step leaves its own notification and the phone fills with stale alarms."""
-    assert push_step()["data"]["data"]["tag"] == "creek_alert_tier"
+    assert push_step()["data"]["tag"] == "creek_alert_tier"
+
+
+def test_title_and_message_are_present_on_the_device_action():
+    """Device actions carry title/message as top-level keys, not nested under `data:`
+    the way a plain notify service call does -- a leftover nested `data.title` would
+    silently produce a blank notification."""
+    step = push_step()
+    assert "{{ push_title }}" in step["title"]
+    assert "{{ why }}" in step["message"]
 
 
 def test_the_alert_describes_the_tier_that_fired_it():

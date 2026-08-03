@@ -3,6 +3,32 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.14.2
+
+- **Fixed: 0.14.1's companion-app push failed outright** — Home Assistant reported
+  `automation.creek_alert_tier_changed has an unknown action: notify.ryanphone` and the
+  automation never ran. The design assumed each companion-app phone has a fixed,
+  guessable `notify.<name>` service; it does not, reliably, and there is no way to
+  derive that string from a device without asking Home Assistant to resolve it.
+
+  Targets are now Home Assistant **device ids** (`notify_targets` in the automation's
+  variables — find one under Settings → Devices & Services → Devices → click the phone →
+  the URL ends in the id), fired through a *device action*
+  (`device_id`/`domain: mobile_app`/`type: notify`) instead of a templated service call.
+  This is the same mechanism community blueprints use for mobile notifications (e.g.
+  SgtBatten/HA_blueprints' Frigate notifications) — Home Assistant resolves the id to
+  the right notify call internally, so nothing here has to know or guess a service name.
+  The critical/`alarm_stream` payload (`channel`, `importance`, `tag`, `ttl`, `priority`)
+  carries over unchanged; only `title`/`message` moved from nested under `data:` to
+  top-level, which is where a device action expects them.
+
+  `test_targets_are_device_ids_not_notify_service_names` and
+  `test_the_push_is_a_device_action_not_a_templated_service_call` pin the shape; both
+  verified to fail against the 0.14.1 form. Two targets are configured out of the box
+  (both household phones) rather than one, since this was already a multi-target list.
+  - Re-copy `ha-packages/creek_warning.yaml` as with 0.14.1 — this does not arrive with
+    an add-on update.
+
 ## 0.14.1
 
 - **Alert tier changes now push to the companion app, critically** — until now the tier
