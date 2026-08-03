@@ -61,27 +61,40 @@ Two things still need a **one-time** manual setup (they can't come from the add-
    `alarm_stream` channel, so it sounds at alarm volume through silent and vibrate and
    stays on screen until dismissed. Below it, an ordinary notification.
 
-   **Dry-run test it, once, for real** (spec §8 — an untested alarm is not an alarm).
-   A manual run reads current conditions, which are normally tier 0, so it would send a
-   quiet all-clear and prove nothing about the alarm path. Force it:
+   > **Required, once, per phone: let the channel override Do Not Disturb.** This is not
+   > a formality and it is not Android's default — the companion app documentation is
+   > explicit that notifications "do not override Do Not Disturb settings" unless a
+   > notification channel is given permission to. **No YAML in this repo can grant that**;
+   > only the phone's owner can, by hand:
+   >
+   > Settings → Apps → Home Assistant → Notifications → **alarm_stream** → allow it to
+   > override / ignore Do Not Disturb.
+   >
+   > The channel only appears in that list *after* the first notification using it has
+   > arrived, so run the dry run below once first, then grant the permission, then run it
+   > again to confirm.
+   >
+   > Two consequences worth knowing. Android fixes a channel's importance and sound the
+   > first time it appears and **ignores every later change** ("only lowering of the
+   > importance will work"), so this is a one-time setup that later edits cannot undo —
+   > or repair. And renaming the channel starts a *fresh* one with no permission, which
+   > on the phone looks exactly like the alarm having stopped working. Don't rename it.
 
-   1. Temporarily set `critical_from_tier: 0` in the automation, and reload automations
-      (Developer tools → YAML → Reload automations).
-   2. Turn Do Not Disturb **on**. Put the phone face-down, screen off, in another room.
-   3. Developer tools → Actions → `automation.trigger`, target
-      `automation.creek_alert_tier_changed`, Run.
-   4. Both phones should sound at alarm volume and the notification should stay on
-      screen until dismissed.
-   5. Set `critical_from_tier` back to `2` and reload again.
+   **Dry-run test it** (spec §8 — an untested alarm is not an alarm). One action, no
+   threshold editing:
 
-   If step 4 is silent, the push arrived but Android muted it: check Settings → Sound →
-   Do Not Disturb → Alarms. If *nothing at all* arrives, check Settings → Automations →
-   the automation's trace — a red error there means it failed before sending.
+   1. Turn Do Not Disturb **on**. Phones face-down, screens off, in another room.
+   2. Developer tools → Actions → `script.creek_alert_test` → Run. (It sends the real
+      critical payload — the same one a Tier 4 sends, sharing the same YAML — to every
+      configured phone, under its own tag so it never replaces a live alert.)
+   3. Both phones should sound **at alarm volume** and stay on screen until dismissed.
 
-   > **The one thing this repo cannot do for you.** `alarm_stream` carries the alert
-   > through DND *because Android treats it as an alarm* — which holds only while your
-   > DND profile allows alarms through. That is Android's default, but it is a
-   > device-side setting no YAML here can set or read back. Hence the test above.
+   | What happened | What it means |
+   |---|---|
+   | Nothing at all on any phone | The script failed before sending — check its trace under Settings → Automations & Scenes → Scripts |
+   | Notification arrives, silent | The channel has no DND override yet — grant it (box above), then re-run |
+   | Sounds, but quiet / not on alarm volume | Check Android Settings → Sound → Do Not Disturb → Alarms |
+   | One phone only | That phone's `device_id` is wrong, or the app is not logged in on it |
 
 2. **Dashboard** — copy `dashboards/creek_flood_watch.yaml` → `/config/dashboards/` and
    register it (core Lovelace, keeps your UI dashboards untouched):

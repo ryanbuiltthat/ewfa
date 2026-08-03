@@ -3,10 +3,11 @@
 What to do when a storm hits. Checklist form — meant to be readable on a phone at 2 am.
 
 > **ewfa now pushes to your phone — but do not treat it as your alarm clock.** Tier 2
-> (Watch) and above send a critical push on Android's alarm stream, which sounds through
-> silent and Do Not Disturb; below that, an ordinary notification. It has to be tested on
-> your own phone with DND actually on before it counts as an alarm (DOCS.md says how),
-> and the thresholds behind it are still uncalibrated. No TTS, nothing else in the house.
+> (Watch) and above send a critical push on Android's alarm stream; below that, an
+> ordinary notification. Getting it through **Do Not Disturb needs a one-time permission
+> granted on each phone by hand** — it is not Android's default and no config here can
+> set it. Until you have run `script.creek_alert_test` with DND on and actually heard it,
+> assume it will not wake you. Thresholds are also still uncalibrated.
 > **NWS/NOAA is still your real alerting path.** This is a data-collection aid.
 
 > **Tier 4 cannot fire yet.** The SEN0676 radar isn't mounted, so tiers 3–4 are dormant

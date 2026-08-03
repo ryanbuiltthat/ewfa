@@ -112,6 +112,9 @@ automation:
       push_title: >-
         {{ 'Creek all-clear' if tier == 0
            else 'Creek ' ~ label ~ ' (Tier ' ~ tier ~ ')' }}
+      # Constant per notification *stream*, so a real alert and the dry-run test below
+      # replace their own previous message and never each other's.
+      push_tag: creek_alert_tier
     triggers:
       - trigger: state
         entity_id: sensor.ackerly_creek_modeling_creek_alert_tier
@@ -194,18 +197,30 @@ automation:
           {{ '' if tier == 0 else
              '— thresholds are not yet field-calibrated; verify before acting.' }}
         data:
-          tag: creek_alert_tier
+          tag: "{{ push_tag }}"
           notification_icon: >-
             {{ 'mdi:check-circle-outline' if tier == 0 else 'mdi:home-flood' }}
           # ttl/priority get the push past Android's Doze batching; without them a
-          # sleeping phone may sit on the message until the screen wakes.
+          # sleeping phone may sit on the message until the screen wakes. On their own
+          # they do NOT make a notification audible under Do Not Disturb — the companion
+          # docs are explicit that "by default they also do not override Do Not Disturb
+          # settings, if you would like to override this you will need to use
+          # notification channels".
           ttl: 0
           priority: high
-          # alarm_stream is the companion app's documented critical channel: the sound
-          # plays on the alarm stream, which is what carries it through silent, vibrate
-          # and Do Not Disturb. See the DND caveat in DOCS.md — Android must be
-          # allowing alarms through DND for this to be audible, which is its default
-          # but is worth confirming once, out loud, before relying on it at 3 a.m.
+          # `alarm_stream` routes the sound through Android's alarm stream, which is what
+          # gets it past silent and vibrate. Getting it past DO NOT DISTURB is a separate,
+          # DEVICE-SIDE permission that only the phone's owner can grant, once, by hand:
+          #   Settings -> Apps -> Home Assistant -> Notifications -> "alarm_stream"
+          #   -> allow it to override / ignore Do Not Disturb.
+          # No YAML here can set or read that back. See DOCS.md; it is step one of the
+          # dry run, not an optional confirmation.
+          #
+          # The channel name is also load-bearing and must stay stable: Android fixes a
+          # channel's importance and sound the first time it appears and ignores every
+          # later change ("only lowering of the importance will work"). Renaming it
+          # silently starts a fresh channel with no DND permission, which reads on the
+          # phone as the alarm having stopped working.
           channel: "{{ 'alarm_stream' if is_critical else 'Creek Watch' }}"
           importance: "{{ 'high' if is_critical else 'default' }}"
           # A critical alert stays put until acknowledged; lower tiers behave like any
@@ -215,3 +230,37 @@ automation:
       - <<: *creek_push
         device_id: 3b510b04ed78e8ef686a358daa0cc84d   # Kelly's phone
     mode: single
+
+script:
+  # Spec §8's dry run, as one action instead of a procedure. The previous instructions
+  # said to temporarily set critical_from_tier to 0, reload, test, and set it back —
+  # four steps around the thing being tested, and skipping the first silently turns the
+  # test into a *non*-critical all-clear that proves nothing while looking like a
+  # failure. This sends the real critical payload directly.
+  #
+  # It reuses the same *creek_push anchor as the automation above, so what this sends is
+  # by construction what a real Tier 4 sends — a test that drifted from the alert it is
+  # meant to validate would be worse than none. Only the tag differs, so a test never
+  # replaces a live alert on the phone.
+  creek_alert_test:
+    alias: "Creek alert TEST (critical dry run)"
+    icon: mdi:alarm-light
+    mode: single
+    description: >-
+      Sends the real critical flood-alert payload to every configured phone. Run it with
+      Do Not Disturb ON and the phones face-down: if they do not sound at alarm volume,
+      the notification channel has not been granted permission to override Do Not
+      Disturb (Settings -> Apps -> Home Assistant -> Notifications -> "alarm_stream").
+    sequence:
+      - variables:
+          tier: 4
+          is_critical: true
+          push_tag: creek_alert_test
+          push_title: "Creek alert TEST (critical)"
+          why: >-
+            TEST — no flooding is occurring. If this did not wake you at alarm volume
+            through Do Not Disturb, the real alert will not either.
+      - <<: *creek_push
+        device_id: efa8fde8c961dd7d5c23feda71661457   # Ryan's phone
+      - <<: *creek_push
+        device_id: 3b510b04ed78e8ef686a358daa0cc84d   # Kelly's phone
