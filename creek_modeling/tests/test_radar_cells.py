@@ -143,6 +143,20 @@ def test_a_broken_confirmation_streak_counts_only_the_run_from_the_newest_scan()
     assert out["radar_threat_scan_count"] == 1.0
 
 
+def test_a_gap_longer_than_the_freshness_window_breaks_the_streak():
+    """Two fixes both individually pass the intercept test, but they are 24 min
+    apart — longer than FRESH_MINUTES (12) — so SCIT lost and re-acquired the
+    track rather than watching it continuously. That is not a confirmed streak."""
+    lat, lon = west_of_site(10.0)
+    src, _ = build([
+        ("202607292104", "T1", 270, 20, 50, lat, lon),   # 24 min before the newest
+        ("202607292128", "T1", 270, 20, 50, lat, lon),   # newest
+    ])
+    out = src.poll()
+    assert out["radar_threat_cells"] == 1.0
+    assert out["radar_threat_scan_count"] == 1.0
+
+
 def test_scan_count_is_the_max_across_simultaneous_threats():
     far = west_of_site(10.0)      # one confirming scan
     near = west_of_site(5.0)      # two confirming scans

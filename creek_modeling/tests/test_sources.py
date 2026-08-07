@@ -53,6 +53,13 @@ def test_no_sources_returns_all_none():
     assert all(v is None for v in out.values())
 
 
+def test_every_feature_key_is_a_real_feature_row_field():
+    from dataclasses import fields
+    from app.features import FeatureRow
+    missing = set(FEATURE_KEYS) - {f.name for f in fields(FeatureRow)}
+    assert not missing, missing
+
+
 def test_merges_and_filters_to_feature_keys():
     c = make_empty_coordinator()
     fake = FakeSource()

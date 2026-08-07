@@ -166,11 +166,19 @@ class RadarCells:
         """How many consecutive scans, newest-first, independently qualify this storm
         as an inbound threat. A track that lost and re-found its intercept resets to
         however far back the current unbroken run reaches — an older confirmation does
-        not "count" once the streak has broken."""
+        not "count" once the streak has broken, whether by failing the intercept test
+        or by a gap longer than FRESH_MINUTES between two retained fixes (SCIT lost and
+        re-acquired the track, or recycled the ID, rather than watching it continuously)."""
         count = 0
+        prev_valid = None
         for row in rows:
             if self._intercept_eta_min(row) is None:
                 break
+            if prev_valid is not None:
+                gap_min = (prev_valid - row["valid"]).total_seconds() / 60.0
+                if gap_min > FRESH_MINUTES:
+                    break
+            prev_valid = row["valid"]
             count += 1
         return count
 
