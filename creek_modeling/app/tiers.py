@@ -72,6 +72,16 @@ WATCH_PROBABILITY = 0.20
 # where the upstream gauges are geometrically behind the house (sources/radar_cells.py).
 # The source already filters to >= 40 dBZ inbound cells; this only gates on how soon.
 WATCH_RADAR_ETA_MIN = 45.0
+# A cell this intense, or this close, alerts on the first qualifying scan — waiting on
+# confirmation costs lead time on exactly the storms that matter most (see
+# sources/radar_cells.py's module docstring on the W/NW approach gap).
+WATCH_RADAR_SEVERE_DBZ = 50.0
+WATCH_RADAR_IMMINENT_ETA_MIN = 20.0
+# A marginal cell (below WATCH_RADAR_SEVERE_DBZ, further out than the imminent horizon)
+# needs this many consecutive confirming scans before it counts — kills the flapping a
+# single noisy SCIT vector estimate causes on a cell that isn't urgent enough to act on
+# immediately anyway.
+WATCH_RADAR_CONFIRM_SCANS = 2.0
 
 # --- Tier 3 Warning: creek responding (gauge required) ---
 WARNING_STAGE_FT = 2.0             # bank top is +3 ft (spec §2)
@@ -150,10 +160,16 @@ def compute_tier(row: FeatureRow, flood_probability: float | None) -> tuple[int,
     # Note the inverted comparison: a *smaller* ETA is the worse condition, so _ge does
     # not apply — and a missing ETA (None = no inbound cell) must still never fire.
     if row.radar_threat_eta_min is not None and row.radar_threat_eta_min <= WATCH_RADAR_ETA_MIN:
-        count = int(row.radar_threat_cells or 1)
-        dbz = f" ({row.radar_threat_max_dbz:.0f} dBZ)" if row.radar_threat_max_dbz else ""
-        reasons.append((2, f"{count} radar cell(s) inbound{dbz}, "
-                           f"~{row.radar_threat_eta_min:.0f} min out"))
+        severe = _ge(row.radar_threat_max_dbz, WATCH_RADAR_SEVERE_DBZ)
+        imminent = row.radar_threat_eta_min <= WATCH_RADAR_IMMINENT_ETA_MIN
+        confirmed = _ge(row.radar_threat_scan_count, WATCH_RADAR_CONFIRM_SCANS)
+        primed = (_ge(row.soil_moisture_mean_pct, ADVISORY_SOIL_PCT)
+                  or _ge(row.api_index_in, ADVISORY_API_INDEX_IN))
+        if severe or imminent or (confirmed and primed):
+            count = int(row.radar_threat_cells or 1)
+            dbz = f" ({row.radar_threat_max_dbz:.0f} dBZ)" if row.radar_threat_max_dbz else ""
+            reasons.append((2, f"{count} radar cell(s) inbound{dbz}, "
+                               f"~{row.radar_threat_eta_min:.0f} min out"))
     if p >= WATCH_PROBABILITY:
         reasons.append((2, f"model probability {p * 100:.0f}%"))
 

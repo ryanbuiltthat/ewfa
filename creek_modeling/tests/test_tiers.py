@@ -114,6 +114,49 @@ def test_a_distant_or_absent_radar_cell_never_fires():
     assert compute_tier(row(radar_threat_eta_min=None), 0.0)[0] == 0
 
 
+def test_a_severe_cell_fires_even_unconfirmed_and_dry():
+    tier, _, reasons = compute_tier(
+        row(radar_threat_eta_min=30.0, radar_threat_cells=1.0,
+            radar_threat_max_dbz=55.0, radar_threat_scan_count=1.0,
+            soil_moisture_mean_pct=20.0, api_index_in=0.0), 0.0)
+    assert tier == 2
+    assert "radar" in reasons[0]
+
+
+def test_an_imminent_cell_fires_even_unconfirmed_and_dry():
+    tier, _, reasons = compute_tier(
+        row(radar_threat_eta_min=15.0, radar_threat_cells=1.0,
+            radar_threat_max_dbz=42.0, radar_threat_scan_count=1.0,
+            soil_moisture_mean_pct=20.0, api_index_in=0.0), 0.0)
+    assert tier == 2
+    assert "radar" in reasons[0]
+
+
+def test_a_marginal_unconfirmed_cell_never_fires_even_on_wet_ground():
+    tier, _, _ = compute_tier(
+        row(radar_threat_eta_min=30.0, radar_threat_cells=1.0,
+            radar_threat_max_dbz=42.0, radar_threat_scan_count=1.0,
+            soil_moisture_mean_pct=90.0), 0.0)
+    assert tier == 0
+
+
+def test_a_marginal_confirmed_cell_never_fires_on_dry_ground():
+    tier, _, _ = compute_tier(
+        row(radar_threat_eta_min=30.0, radar_threat_cells=1.0,
+            radar_threat_max_dbz=42.0, radar_threat_scan_count=2.0,
+            soil_moisture_mean_pct=20.0, api_index_in=0.0), 0.0)
+    assert tier == 0
+
+
+def test_a_marginal_confirmed_cell_fires_on_primed_ground():
+    tier, _, reasons = compute_tier(
+        row(radar_threat_eta_min=30.0, radar_threat_cells=1.0,
+            radar_threat_max_dbz=42.0, radar_threat_scan_count=2.0,
+            soil_moisture_mean_pct=90.0), 0.0)
+    assert tier == 2
+    assert "radar" in reasons[0]
+
+
 def test_stage_drives_warning_and_emergency():
     assert compute_tier(row(stage_ft=2.1), 0.0)[:2] == (3, "Warning")
     assert compute_tier(row(stage_ft=2.9), 0.0)[:2] == (4, "Emergency")
