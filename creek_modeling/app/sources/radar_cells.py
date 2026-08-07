@@ -53,6 +53,7 @@ FEATURE_KEYS = (
     "radar_threat_cells",
     "radar_threat_eta_min",
     "radar_threat_max_dbz",
+    "radar_threat_scan_count",
 )
 
 # PLACEHOLDER THRESHOLDS — tune with observed storms, like everything else in tiers.py.
@@ -96,37 +97,40 @@ class RadarCells:
             "https://mesonet.agron.iastate.edu/cgi-bin/request/gis/nexrad_storm_attrs.py"
             f"?fmt=csv&radar={self._radar}&sts={sts}&ets={ets}"
         )
-        cells = self._current_cells(self._fetch(url))
+        by_id = self._parse(self._fetch(url))
+        cells = self._current_cells(by_id)
 
         out: dict[str, float | None] = {
             "radar_cells_tracked": float(len(cells)),
             "radar_threat_cells": 0.0,
             "radar_threat_eta_min": None,
             "radar_threat_max_dbz": None,
+            "radar_threat_scan_count": None,
         }
-        etas, dbzs = [], []
+        etas, dbzs, scan_counts = [], [], []
         for cell in cells:
             eta = self._intercept_eta_min(cell)
             if eta is not None:
                 etas.append(eta)
                 dbzs.append(cell["max_dbz"])
+                scan_counts.append(self._scan_count(by_id[cell["id"]]))
         if etas:
             out["radar_threat_cells"] = float(len(etas))
             out["radar_threat_eta_min"] = round(min(etas), 1)
             out["radar_threat_max_dbz"] = max(dbzs)
+            out["radar_threat_scan_count"] = float(max(scan_counts))
         return out
 
     @staticmethod
-    def _current_cells(text: str) -> list[dict]:
-        """Newest row per storm ID, dropping cells that fell out of tracking.
+    def _parse(text: str) -> dict[str, list[dict]]:
+        """All in-window rows, grouped by storm ID, each list newest-first.
 
-        Every volume scan re-lists every tracked cell, so the raw window holds each
-        storm several times over; only its latest fix describes the present. A cell
-        whose latest fix is much older than the newest scan was dropped by SCIT
-        (dissipated or merged) and no longer exists to threaten anything.
+        Every volume scan re-lists every tracked cell, so a storm ID's list holds one
+        entry per scan it was seen in. Keeping the full history (rather than only the
+        newest fix) is what lets `_scan_count` tell a cell whose track has settled from
+        one whose vector is still flopping scan to scan.
         """
-        newest: dict[str, dict] = {}
-        latest_scan: datetime | None = None
+        by_id: dict[str, list[dict]] = {}
         for row in csv.DictReader(io.StringIO(text)):
             try:
                 cell = {
@@ -140,15 +144,35 @@ class RadarCells:
                 }
             except (KeyError, TypeError, ValueError):
                 continue    # torn/malformed row — skip it, keep the rest
-            prev = newest.get(cell["id"])
-            if prev is None or cell["valid"] > prev["valid"]:
-                newest[cell["id"]] = cell
-            if latest_scan is None or cell["valid"] > latest_scan:
-                latest_scan = cell["valid"]
-        if latest_scan is None:
+            by_id.setdefault(cell["id"], []).append(cell)
+        for rows in by_id.values():
+            rows.sort(key=lambda c: c["valid"], reverse=True)
+        return by_id
+
+    @staticmethod
+    def _current_cells(by_id: dict[str, list[dict]]) -> list[dict]:
+        """Newest row per storm ID, dropping cells that fell out of tracking.
+
+        A cell whose latest fix is much older than the newest scan was dropped by SCIT
+        (dissipated or merged) and no longer exists to threaten anything.
+        """
+        if not by_id:
             return []
+        latest_scan = max(rows[0]["valid"] for rows in by_id.values())
         cutoff = latest_scan - timedelta(minutes=FRESH_MINUTES)
-        return [c for c in newest.values() if c["valid"] >= cutoff]
+        return [rows[0] for rows in by_id.values() if rows[0]["valid"] >= cutoff]
+
+    def _scan_count(self, rows: list[dict]) -> int:
+        """How many consecutive scans, newest-first, independently qualify this storm
+        as an inbound threat. A track that lost and re-found its intercept resets to
+        however far back the current unbroken run reaches — an older confirmation does
+        not "count" once the streak has broken."""
+        count = 0
+        for row in rows:
+            if self._intercept_eta_min(row) is None:
+                break
+            count += 1
+        return count
 
     def _intercept_eta_min(self, cell: dict) -> float | None:
         """Minutes until this cell's closest approach to the site, or None if it is

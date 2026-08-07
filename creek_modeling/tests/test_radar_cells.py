@@ -58,6 +58,7 @@ def test_the_same_cell_coming_from_the_east_is_outbound_and_no_threat():
     assert out["radar_threat_cells"] == 0.0
     assert out["radar_threat_eta_min"] is None
     assert out["radar_threat_max_dbz"] is None
+    assert out["radar_threat_scan_count"] is None
 
 
 def test_an_intense_cell_passing_wide_is_not_a_threat():
@@ -107,6 +108,58 @@ def test_eta_is_the_soonest_of_several_threats():
     assert out["radar_threat_cells"] == 2.0
     assert abs(out["radar_threat_eta_min"] - 15.0) < 0.5
     assert out["radar_threat_max_dbz"] == 52.0
+
+
+def test_a_single_scan_yields_scan_count_one():
+    lat, lon = west_of_site(10.0)
+    src, _ = build([("202607292128", "Q7", 270, 20, 50, lat, lon)])
+    out = src.poll()
+    assert out["radar_threat_scan_count"] == 1.0
+
+
+def test_two_consecutive_confirming_scans_yield_scan_count_two():
+    lat, lon = west_of_site(10.0)
+    src, _ = build([
+        ("202607292122", "N4", 270, 20, 50, lat, lon),   # older scan: inbound
+        ("202607292128", "N4", 270, 20, 50, lat, lon),   # newest scan: inbound
+    ])
+    out = src.poll()
+    assert out["radar_threat_cells"] == 1.0
+    assert out["radar_threat_scan_count"] == 2.0
+
+
+def test_a_broken_confirmation_streak_counts_only_the_run_from_the_newest_scan():
+    """The cell was inbound three scans ago, lost its track for one scan, then
+    re-qualified. Only the unbroken run from the newest scan counts — two scans back
+    does not get to "vote" once the streak has broken."""
+    lat, lon = west_of_site(10.0)
+    src, _ = build([
+        ("202607292116", "P6", 270, 20, 50, lat, lon),   # 3 scans back: inbound
+        ("202607292122", "P6", 90, 20, 50, lat, lon),    # 2 scans back: outbound (breaks it)
+        ("202607292128", "P6", 270, 20, 50, lat, lon),   # newest: inbound again
+    ])
+    out = src.poll()
+    assert out["radar_threat_cells"] == 1.0
+    assert out["radar_threat_scan_count"] == 1.0
+
+
+def test_scan_count_is_the_max_across_simultaneous_threats():
+    far = west_of_site(10.0)      # one confirming scan
+    near = west_of_site(5.0)      # two confirming scans
+    src, _ = build([
+        ("202607292128", "R8", 270, 20, 45, far[0], far[1]),
+        ("202607292122", "S9", 270, 20, 52, near[0], near[1]),
+        ("202607292128", "S9", 270, 20, 52, near[0], near[1]),
+    ])
+    out = src.poll()
+    assert out["radar_threat_cells"] == 2.0
+    assert out["radar_threat_scan_count"] == 2.0
+
+
+def test_scan_count_is_none_when_there_is_no_current_threat():
+    src, _ = build([])
+    out = src.poll()
+    assert out["radar_threat_scan_count"] is None
 
 
 def test_only_the_newest_fix_per_storm_id_counts():
