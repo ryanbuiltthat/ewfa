@@ -3,6 +3,19 @@
 All notable changes to the **Ackerly Creek Modeling** add-on are documented here.
 The version matches `version:` in `config.yaml`; bump it to trigger the GUI Update button.
 
+## 0.17.0
+
+- **Radar-cell Watch alerts now require confirmation on marginal cells.** Storm cells
+  below 50 dBZ and more than 20 minutes out previously raised a Watch on a single scan,
+  which flapped on and off as SCIT's per-scan track vector revised itself — most inbound
+  cells changed track on the very next scan. Marginal cells now need two consecutive
+  confirming scans (`radar_threat_scan_count`, new — a byproduct of retaining each storm
+  ID's in-window scan history instead of discarding it after the newest fix) **and**
+  already-elevated soil moisture or antecedent precipitation index before they raise a
+  Watch, the same alone-vs-with-wet-ground pattern the WPC ERO rule already uses. A cell
+  that clears 50 dBZ, or is within 20 minutes, still alerts immediately on the first
+  qualifying scan — advance warning on the storms that matter most is unchanged.
+
 ## 0.16.0
 
 - **WPC Excessive Rainfall Outlook (slice 2h)** — the Weather Prediction Center's day
