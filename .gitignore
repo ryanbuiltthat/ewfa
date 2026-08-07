@@ -430,3 +430,6 @@ FodyWeavers.xsd
 
 # ESPHome node secrets (spec §8: secrets never committed)
 esphome/secrets.yaml
+
+# Superpowers subagent-driven-development scratch workspace
+.superpowers/
