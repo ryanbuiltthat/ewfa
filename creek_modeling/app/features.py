@@ -67,6 +67,7 @@ class FeatureRow:
     radar_threat_cells: float | None = None
     radar_threat_eta_min: float | None = None
     radar_threat_max_dbz: float | None = None
+    radar_threat_scan_count: float | None = None
     # WPC Excessive Rainfall Outlook (slice 2h) — day-scale flood-risk categories
     # (0 none · 1 Marginal · 2 Slight · 3 Moderate · 4 High). 0.0 means WPC drew no
     # risk area here; None means the product could not be read.

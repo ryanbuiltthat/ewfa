@@ -48,7 +48,7 @@ FEATURE_KEYS = (
     "snow_water_equivalent_in",
     # 2g — NEXRAD storm-cell tracks (inbound-cell early warning)
     "radar_cells_tracked", "radar_threat_cells",
-    "radar_threat_eta_min", "radar_threat_max_dbz",
+    "radar_threat_eta_min", "radar_threat_max_dbz", "radar_threat_scan_count",
     # 2h — WPC Excessive Rainfall Outlook (day-scale flood-risk forecast)
     "wpc_ero_day1_risk", "wpc_ero_day2_risk", "wpc_ero_day3_risk",
 )
